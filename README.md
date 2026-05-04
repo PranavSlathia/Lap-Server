@@ -1,39 +1,199 @@
-# Lap-Server — Dell Vostro Home Server
+# Lap-Server
 
-Management repo for a Dell Vostro laptop converted into an Ubuntu home server. Hosts personal projects (currently MindOverChatter at `https://moc.prsnl.fyi`).
+A Dell Vostro laptop turned into a personal home server. Runs Ubuntu Server 24.04 LTS, hosts personal projects via Cloudflare Tunnel, and is managed remotely from anywhere via Tailscale VPN.
 
-## Contents
+This repo is the **management layer** — documentation, config snapshots, and helper scripts. The server itself lives in a corner with the lid closed, plugged in, doing its job.
 
-| Path | Purpose |
-|------|---------|
-| `CLAUDE.md` | Full server documentation, port registry, deployed projects, troubleshooting |
-| `AGENT-BRIEFING.md` | Quick context briefing for AI agents deploying new projects to this server |
-| `configs/` | Snapshots of server config files (sanitized — see `.example` versions) |
-| `docker/docker-compose.yml` | Infrastructure compose stack (Portainer, Uptime Kuma, Dozzle, Watchtower, Autoheal) |
-| `scripts/health-check.sh` | Run a full server health check via SSH |
-| `scripts/deploy-compose.sh` | Deploy docker-compose to the server |
+---
 
-## Getting Started
+## Why a laptop?
+
+Old laptops are perfect home servers:
+
+- **Free** — repurpose hardware that's gathering dust instead of paying for a VPS.
+- **Built-in UPS** — the battery keeps it alive through power blips.
+- **Quiet, low-power** — sips ~20W of electricity, sits silently with the lid closed.
+- **Real hardware** — not a Raspberry Pi; runs full x86 Docker images, ML services, databases.
+
+This particular Dell Vostro has an Intel Celeron 2957U (1.4GHz, 2 cores), 8GB RAM, and a Kingston A400 240GB SSD. Modest, but plenty for a single-user app stack.
+
+---
+
+## Architecture
+
+```
+                ┌─────────────────────────────────────────────┐
+                │            Public Internet                  │
+                └──────────────────┬──────────────────────────┘
+                                   │
+                                   ▼
+                        ┌──────────────────────┐
+                        │   Cloudflare Edge    │  (HTTPS termination,
+                        │   moc.prsnl.fyi      │   DDoS, caching)
+                        └──────────┬───────────┘
+                                   │ Cloudflare Tunnel
+                                   │ (outbound-only,
+                                   │  no port forwarding)
+                                   ▼
+   ┌───────────────────────────────────────────────────────────────────┐
+   │  Dell Vostro — Ubuntu Server 24.04 (hostname: prsnl)              │
+   │                                                                   │
+   │  ┌─────────────────────────────────────────────────────────────┐  │
+   │  │  cloudflared (systemd)                                      │  │
+   │  │     ↓ proxies moc.prsnl.fyi → 127.0.0.1:5173                │  │
+   │  └────────────────────────┬────────────────────────────────────┘  │
+   │                           │                                       │
+   │  ┌────────────────────────▼────────────────────────────────────┐  │
+   │  │  Docker (live-restore, log rotation 10MB×3)                 │  │
+   │  │                                                             │  │
+   │  │  Project containers (per project, in own compose):          │  │
+   │  │    moc-web (nginx)  ──→  moc-server (Hono)  ──→  moc-db     │  │
+   │  │                              │                  (pgvector)  │  │
+   │  │                              ▼                              │  │
+   │  │                          moc-memory (Mem0)                  │  │
+   │  │                                                             │  │
+   │  │  Infra containers (shared, in ~/docker/docker-compose.yml): │  │
+   │  │    Portainer · Uptime Kuma · Dozzle · Watchtower            │  │
+   │  │    Autoheal · Netdata                                       │  │
+   │  └─────────────────────────────────────────────────────────────┘  │
+   │                                                                   │
+   │  Hardening: UFW · fail2ban · SSH key-only · unattended-upgrades  │
+   └───────────────────────────────────────────────────────────────────┘
+                         ▲                          ▲
+                         │ SSH (key auth)           │ Tailscale VPN
+                         │                          │ (100.103.66.92)
+                ┌────────┴──────────┐      ┌────────┴─────────┐
+                │   Mac Mini        │      │   MacBook Air,    │
+                │   (home WiFi)     │      │   iPhone (anywhere)│
+                └───────────────────┘      └───────────────────┘
+```
+
+### How traffic flows
+
+- **Public users** → `https://moc.prsnl.fyi` → Cloudflare Edge → Tunnel → host's `cloudflared` → `localhost:5173` (nginx) → routes `/api/*` to `localhost:3000` (backend) via Docker network.
+- **Admin (you)** → SSH or Tailscale → host directly → all services on private ports (only reachable via LAN or Tailscale).
+
+No port forwarding on your home router. Cloudflare Tunnel makes the connection outbound-only.
+
+---
+
+## Remote management
+
+The server has **no public-facing admin ports**. To manage it:
 
 ```bash
-# Clone
+# From home WiFi
+ssh pronav@192.168.1.18
+
+# From anywhere in the world (Tailscale VPN)
+ssh pronav@100.103.66.92
+```
+
+**Tailscale** is what makes this possible — it creates a private mesh network across your devices (Mac Mini, MacBook Air, iPhone, the server). Each device gets a stable `100.x.x.x` IP that works regardless of which WiFi you're on. No VPN passwords, no port forwards, no dynamic DNS.
+
+Once on the Tailscale network, all dashboards become reachable:
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| Portainer | https://100.103.66.92:9443 | Docker container management |
+| Uptime Kuma | http://100.103.66.92:3001 | Monitor app/service uptime |
+| Dozzle | http://100.103.66.92:9999 | Live tail Docker logs |
+| Netdata | http://100.103.66.92:19999 | Real-time CPU/RAM/disk/network metrics |
+
+---
+
+## How projects are deployed
+
+Every project follows the same pattern:
+
+1. **Code lives at** `~/docker/<project-name>/` on the server (cloned from GitHub via `gh`)
+2. **Each project has its own** `docker-compose.prod.yml` and `.env` (with `chmod 600`)
+3. **All containers use** `restart: always` so they survive reboots
+4. **Database ports stay internal** to the Docker network — never exposed to the host
+5. **Public exposure** happens via Cloudflare Tunnel, not by opening firewall ports
+6. **Backups** run daily via cron (e.g., `~/docker/<project>/backup-db.sh` at 2 AM, 7-day retention)
+
+See `CLAUDE.md` for the full **Port Registry** before assigning new ports — no conflicts allowed across projects.
+
+---
+
+## Adding a new project
+
+```bash
+# 1. SSH in
+ssh pronav@192.168.1.18
+
+# 2. Clone your repo (gh CLI is already authed)
+gh repo clone <owner>/<repo> ~/docker/<project>
+
+# 3. Create .env (chmod 600)
+cd ~/docker/<project>
+nano .env  # add DB passwords, API keys, etc.
+chmod 600 .env
+
+# 4. Pick unused ports from CLAUDE.md → Port Registry
+# 5. Build and start
+docker compose -f docker-compose.prod.yml up -d
+
+# 6. Open ports in UFW only if needed (prefer Tailscale-only for admin UIs)
+sudo ufw allow from 100.64.0.0/10 to any port <PORT>  # Tailscale-only
+
+# 7. Add Cloudflare Tunnel route for public access
+cloudflared tunnel route dns <tunnel-name> <subdomain>.prsnl.fyi
+# Edit /etc/cloudflared/config.yml to add the ingress rule
+sudo systemctl restart cloudflared
+
+# 8. Add Uptime Kuma monitor for the health endpoint
+# 9. Set up a backup cron if there's a database
+# 10. Update CLAUDE.md with the new ports + project section
+```
+
+A more detailed walkthrough lives in `AGENT-BRIEFING.md` — designed for AI agents but works for humans too.
+
+---
+
+## Repo structure
+
+```
+Lap-Server/
+├── README.md              You are here
+├── CLAUDE.md              Full reference: port registry, deployed projects, troubleshooting
+├── AGENT-BRIEFING.md      Quick context for AI agents deploying to this server
+├── configs/               Sanitized snapshots of server config files
+│   ├── docker-daemon.json
+│   ├── fail2ban-jail.local
+│   ├── netplan.yaml.example   (template — fill in your WiFi creds locally)
+│   ├── sysctl-server.conf
+│   └── unattended-upgrades.conf
+├── docker/
+│   └── docker-compose.yml     Infrastructure stack (Portainer, monitoring, etc.)
+└── scripts/
+    ├── health-check.sh        Run a full server health check via SSH
+    └── deploy-compose.sh      Deploy docker-compose to the server
+```
+
+---
+
+## What's running right now
+
+| Project | URL | Stack |
+|---------|-----|-------|
+| MindOverChatter | https://moc.prsnl.fyi | React + Hono + PostgreSQL+pgvector + Mem0 |
+
+Add yours next.
+
+---
+
+## Quick start
+
+```bash
+# Clone this repo
 git clone git@github.com:PranavSlathia/Lap-Server.git
 cd Lap-Server
 
-# Health check (from home WiFi)
-./scripts/health-check.sh
-
-# Or via Tailscale
-./scripts/health-check.sh tailscale
+# Run a health check on the server
+./scripts/health-check.sh           # from home WiFi
+./scripts/health-check.sh tailscale # from anywhere
 ```
 
-## Sensitive Files (Not in Git)
-
-These files contain credentials and are in `.gitignore`. Recreate them locally on the server:
-
-| File | Source |
-|------|--------|
-| `configs/netplan.yaml` | Use `configs/netplan.yaml.example` as template, fill in WiFi credentials |
-| `~/docker/moc/.env` (on server) | Project-specific env vars (DB password, API keys, OAuth tokens) |
-
-See `CLAUDE.md` for full details on what each file should contain.
+Then read `CLAUDE.md` for everything else.
