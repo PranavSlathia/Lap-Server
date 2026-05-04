@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+secrets/
+*.key
+*.pem
+*.crt
+
+# Sensitive server configs (keep .example versions only)
+configs/netplan.yaml
+configs/*-secrets.*
+
+# Backups
+backups/
+*.dump
+*.tar.gz
+
+# Logs
+*.log
