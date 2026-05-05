@@ -180,8 +180,28 @@ fi
 
 # ── Check 11: Public endpoint ──────────────────────────────────
 HTTP_CODE=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 https://moc.prsnl.fyi || echo "000")
-if [[ "$HTTP_CODE" == "200" ]]; then heal "https://moc.prsnl.fyi → HTTP 200"
-else                                  crit "https://moc.prsnl.fyi → HTTP $HTTP_CODE (expected 200)"
+if [[ "$HTTP_CODE" == "200" ]]; then
+  heal "https://moc.prsnl.fyi → HTTP 200"
+else
+  # Auto-fix attempt: if origin localhost:5173 is 200 and cloudflared is active
+  # but public is broken (e.g. 525, 502, 521), it's almost always cloudflared
+  # in a stale-QUIC state — restart it. Same root cause as the 2026-05-05 525.
+  ORIGIN_CODE=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:5173 || echo "000")
+  if [[ "$ORIGIN_CODE" == "200" ]] && systemctl is-active cloudflared >/dev/null 2>&1; then
+    if [[ $DRY_RUN -eq 0 ]]; then
+      systemctl restart cloudflared && sleep 8
+      RETRY_CODE=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 https://moc.prsnl.fyi || echo "000")
+      if [[ "$RETRY_CODE" == "200" ]]; then
+        fix "Public endpoint was HTTP $HTTP_CODE (origin healthy); restarted cloudflared and recovered to HTTP 200"
+      else
+        crit "https://moc.prsnl.fyi → HTTP $HTTP_CODE; tried cloudflared restart, still HTTP $RETRY_CODE"
+      fi
+    else
+      fix "(dry-run) would restart cloudflared (origin localhost:5173 OK, public HTTP $HTTP_CODE)"
+    fi
+  else
+    crit "https://moc.prsnl.fyi → HTTP $HTTP_CODE (origin localhost:5173 → HTTP $ORIGIN_CODE; cloudflared $(systemctl is-active cloudflared 2>&1))"
+  fi
 fi
 
 # ── Check 12: Postgres health ──────────────────────────────────
