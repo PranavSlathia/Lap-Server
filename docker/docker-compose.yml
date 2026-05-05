@@ -16,6 +16,12 @@ services:
       - "9999:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   watchtower:
     image: containrrr/watchtower
@@ -37,5 +43,18 @@ services:
     environment:
       - AUTOHEAL_CONTAINER_LABEL=all
 
+  portainer:
+    image: portainer/portainer-ce:lts
+    container_name: portainer
+    restart: always
+    ports:
+      - "8000:8000"
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
 volumes:
   uptime-kuma-data:
+  portainer_data:
+    external: true

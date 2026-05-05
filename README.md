@@ -168,8 +168,9 @@ Lap-Server/
 ├── docker/
 │   └── docker-compose.yml     Infrastructure stack (Portainer, monitoring, etc.)
 └── scripts/
-    ├── health-check.sh        Run a full server health check via SSH
-    └── deploy-compose.sh      Deploy docker-compose to the server
+    ├── health-check.sh           Run a full server health check via SSH
+    ├── deploy-compose.sh         Deploy docker-compose to the server
+    └── weekly-maintenance.sh     Comprehensive Sunday maintenance — runs as root cron, posts GitHub issue on warnings/critical
 ```
 
 ---
