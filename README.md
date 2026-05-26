@@ -29,36 +29,48 @@ This particular Dell Vostro has an Intel Celeron 2957U (1.4GHz, 2 cores), 8GB RA
                                    ▼
                         ┌──────────────────────┐
                         │   Cloudflare Edge    │  (HTTPS termination,
-                        │   moc.prsnl.fyi      │   DDoS, caching)
+                        │   *.prsnl.fyi        │   DDoS, caching)
                         └──────────┬───────────┘
                                    │ Cloudflare Tunnel
                                    │ (outbound-only,
                                    │  no port forwarding)
                                    ▼
-   ┌───────────────────────────────────────────────────────────────────┐
-   │  Dell Vostro — Ubuntu Server 24.04 (hostname: prsnl)              │
-   │                                                                   │
-   │  ┌─────────────────────────────────────────────────────────────┐  │
-   │  │  cloudflared (systemd)                                      │  │
-   │  │     ↓ proxies moc.prsnl.fyi → 127.0.0.1:5173                │  │
-   │  └────────────────────────┬────────────────────────────────────┘  │
-   │                           │                                       │
-   │  ┌────────────────────────▼────────────────────────────────────┐  │
-   │  │  Docker (live-restore, log rotation 10MB×3)                 │  │
-   │  │                                                             │  │
-   │  │  Project containers (per project, in own compose):          │  │
-   │  │    moc-web (nginx)  ──→  moc-server (Hono)  ──→  moc-db     │  │
-   │  │                              │                  (pgvector)  │  │
-   │  │                              ▼                              │  │
-   │  │                          moc-memory (Mem0)                  │  │
-   │  │                                                             │  │
-   │  │  Infra containers (shared, in ~/docker/docker-compose.yml): │  │
-   │  │    Portainer · Uptime Kuma · Dozzle · Watchtower            │  │
-   │  │    Autoheal · Netdata                                       │  │
-   │  └─────────────────────────────────────────────────────────────┘  │
-   │                                                                   │
-   │  Hardening: UFW · fail2ban · SSH key-only · unattended-upgrades  │
-   └───────────────────────────────────────────────────────────────────┘
+   ┌────────────────────────────────────────────────────────────────────────┐
+   │  Dell Vostro — Ubuntu Server 24.04 (hostname: prsnl)                   │
+   │                                                                        │
+   │  ┌──────────────────────────────────────────────────────────────────┐  │
+   │  │  cloudflared (systemd) — public ingress                          │  │
+   │  │    prsnl.fyi, www.prsnl.fyi → :8088  (prsnl-landing nginx)       │  │
+   │  │    moc.prsnl.fyi           → :5173  (MOC web)                    │  │
+   │  │    xd.prsnl.fyi            → :8005  (Domain Hunter web)          │  │
+   │  └─────────────────────────┬────────────────────────────────────────┘  │
+   │                            │                                           │
+   │  ┌─────────────────────────▼────────────────────────────────────────┐  │
+   │  │  Docker (live-restore, log rotation 10MB×3)                      │  │
+   │  │                                                                  │  │
+   │  │  Project: MindOverChatter (~/docker/moc/)                        │  │
+   │  │    moc-web → moc-server → moc-db (pgvector)                      │  │
+   │  │            ↘ moc-embedding · moc-worker · moc-graph-consolidator │  │
+   │  │            ↘ moc-falkordb                                        │  │
+   │  │                                                                  │  │
+   │  │  Project: Domain Hunter (~/docker/domain-hunter/)                │  │
+   │  │    dh-api · dh-web · dh-scheduler                                │  │
+   │  │    dh-worker-{a2,rdap,wayback,classifier,scoring}                │  │
+   │  │    dh-pg (pgvector) · dh-redis                                   │  │
+   │  │                                                                  │  │
+   │  │  Project: GlitchTip (~/docker/domain-hunter/glitchtip-compose)   │  │
+   │  │    gt-web · gt-worker · gt-pg · gt-redis (error tracking, all)   │  │
+   │  │                                                                  │  │
+   │  │  Project: prsnl-landing (~/docker/landing/)                      │  │
+   │  │    prsnl-landing (nginx) — public marketing page                 │  │
+   │  │                                                                  │  │
+   │  │  Infra (shared, in ~/docker/docker-compose.yml):                 │  │
+   │  │    Portainer · Dockge · Uptime Kuma · Dozzle · Netdata           │  │
+   │  │    Watchtower · Autoheal · pgweb                                 │  │
+   │  └──────────────────────────────────────────────────────────────────┘  │
+   │                                                                        │
+   │  Hardening: UFW · fail2ban · SSH key-only · unattended-upgrades       │
+   └────────────────────────────────────────────────────────────────────────┘
                          ▲                          ▲
                          │ SSH (key auth)           │ Tailscale VPN
                          │                          │ (100.103.66.92)
@@ -70,7 +82,7 @@ This particular Dell Vostro has an Intel Celeron 2957U (1.4GHz, 2 cores), 8GB RA
 
 ### How traffic flows
 
-- **Public users** → `https://moc.prsnl.fyi` → Cloudflare Edge → Tunnel → host's `cloudflared` → `localhost:5173` (nginx) → routes `/api/*` to `localhost:3000` (backend) via Docker network.
+- **Public users** → `https://<sub>.prsnl.fyi` → Cloudflare Edge → Tunnel → host's `cloudflared` → respective nginx/web container on a private port.
 - **Admin (you)** → SSH or Tailscale → host directly → all services on private ports (only reachable via LAN or Tailscale).
 
 No port forwarding on your home router. Cloudflare Tunnel makes the connection outbound-only.
@@ -179,9 +191,10 @@ Lap-Server/
 
 | Project | URL | Stack |
 |---------|-----|-------|
-| MindOverChatter | https://moc.prsnl.fyi | React + Hono + PostgreSQL+pgvector + Mem0 |
-
-Add yours next.
+| prsnl-landing | https://prsnl.fyi | nginx static landing page |
+| MindOverChatter | https://moc.prsnl.fyi | React + Hono + PostgreSQL+pgvector + Mem0 + FalkorDB |
+| Domain Hunter | https://xd.prsnl.fyi (Tailscale-only in practice) | FastAPI + SQLAlchemy + Postgres+pgvector + Redis + 5 workers |
+| GlitchTip | Tailscale: http://100.103.66.92:8011 | Self-hosted Sentry-compatible error tracking |
 
 ---
 
