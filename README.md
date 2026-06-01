@@ -64,6 +64,9 @@ This particular Dell Vostro has an Intel Celeron 2957U (1.4GHz, 2 cores), 8GB RA
    │  │  Project: prsnl-landing (~/docker/landing/)                      │  │
    │  │    prsnl-landing (nginx) — public marketing page                 │  │
    │  │                                                                  │  │
+   │  │  Project: n8n (~/docker/n8n/) — workflow automation              │  │
+   │  │    n8n + n8n-db (postgres), pinned 2.22.6, Tailscale :5678       │  │
+   │  │                                                                  │  │
    │  │  Infra (shared, in ~/docker/docker-compose.yml):                 │  │
    │  │    Portainer · Dockge · Uptime Kuma · Dozzle · Netdata           │  │
    │  │    Watchtower · Autoheal · pgweb                                 │  │
@@ -111,6 +114,7 @@ Once on the Tailscale network, all dashboards become reachable:
 | Uptime Kuma | http://100.103.66.92:3001 | Monitor app/service uptime |
 | Dozzle | http://100.103.66.92:9999 | Live tail Docker logs |
 | Netdata | http://100.103.66.92:19999 | Real-time CPU/RAM/disk/network metrics |
+| n8n | http://100.103.66.92:5678 | Workflow automation (set up the owner account on first visit) |
 
 ---
 
@@ -180,7 +184,9 @@ Lap-Server/
 │   ├── sysctl-server.conf
 │   └── unattended-upgrades.conf
 ├── docker/
-│   └── docker-compose.yml     Infrastructure stack (Portainer, monitoring, etc.)
+│   ├── docker-compose.yml     Infrastructure stack (Portainer, monitoring, etc.)
+│   └── n8n/
+│       └── docker-compose.yml n8n workflow automation (+ Postgres); secrets in .env on the server
 └── scripts/
     ├── health-check.sh           Run a full server health check via SSH
     ├── deploy-compose.sh         Deploy docker-compose to the server
@@ -197,6 +203,7 @@ Lap-Server/
 | MindOverChatter | https://moc.prsnl.fyi | React + Hono + PostgreSQL+pgvector + embedding + graph consolidator + FalkorDB |
 | Domain Hunter | https://xd.prsnl.fyi (Tailscale-only in practice) | FastAPI + SQLAlchemy + Postgres+pgvector + Redis + 5 workers |
 | GlitchTip | Tailscale: http://100.103.66.92:8011 | Self-hosted Sentry-compatible error tracking |
+| n8n | Tailscale: http://100.103.66.92:5678 | Workflow automation (n8n 2.22.6 + Postgres) |
 
 ---
 

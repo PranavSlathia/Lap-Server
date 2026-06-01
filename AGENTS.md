@@ -63,8 +63,9 @@ ssh pronav@100.103.66.92
 | 8007 | Domain Hunter | FastAPI API | dh-api | Localhost only | ~/docker/domain-hunter/compose.yml |
 | 8011 | GlitchTip | Web (error tracking) | gt-web | Tailscale only | ~/docker/domain-hunter/glitchtip-compose.yml |
 | 8088 | prsnl-landing | nginx static | prsnl-landing | Public (via tunnel) | ~/docker/landing/ |
+| 5678 | n8n | Workflow automation UI/API | n8n | Tailscale only | ~/docker/n8n/docker-compose.yml |
 
-**Workers (no host ports):** dh-scheduler, dh-worker-{a2,rdap,wayback,classifier,scoring}, gt-worker, gt-pg (internal 5432), gt-redis (internal 6379), moc-worker.
+**Workers (no host ports):** dh-scheduler, dh-worker-{a2,rdap,wayback,classifier,scoring}, gt-worker, gt-pg (internal 5432), gt-redis (internal 6379), moc-worker, n8n-db (internal 5432).
 
 ### Available Port Ranges for New Projects
 
@@ -207,6 +208,26 @@ Self-hosted expired-domain discovery + scoring pipeline. Ingest GitHub README ci
 | gt-redis | redis:7-alpine | (internal 6379) | Celery broker |
 
 Sentry-compatible — any service using the Sentry SDK can ship events here by setting its DSN. Used by Domain Hunter (`DH_SENTRY_DSN`).
+
+---
+
+### 4. n8n (workflow automation)
+
+**Access:** Tailscale-only at http://100.103.66.92:5678 (no Cloudflare route yet)
+**Deployed:** 2026-06-01
+**Server path:** ~/docker/n8n/docker-compose.yml
+**Env file:** ~/docker/n8n/.env (chmod 600) — `N8N_ENCRYPTION_KEY` (never lose/rotate — encrypts all stored credentials), `N8N_DB_PASSWORD`
+
+| Container | Image | Port | Status |
+|-----------|-------|------|--------|
+| n8n | n8nio/n8n:2.22.6 (pinned) | 5678 | Editor + webhook/execution engine |
+| n8n-db | postgres:16-alpine | (internal 5432) | Workflow / credential / execution store |
+
+Config notes:
+- Postgres backend (not SQLite); execution data pruned at 7 days / 10k max; binary data on filesystem.
+- Memory-capped (n8n 1G, db 256M) + `NODE_OPTIONS=--max-old-space-size=768` so it can't starve MOC.
+- `N8N_SECURE_COOKIE=false` (http over Tailscale's encrypted transport); telemetry off; timezone Asia/Kolkata; task runners on; image pinned.
+- **Public webhook later** (e.g. WhatsApp/Meta): add Cloudflare Tunnel `n8n.prsnl.fyi → localhost:5678`, set `WEBHOOK_URL=https://n8n.prsnl.fyi/`, keep editor Tailscale-only.
 
 ---
 

@@ -1,0 +1,99 @@
+# n8n — self-hosted workflow automation.
+# Access: Tailscale-only (admin UI on http://100.103.66.92:5678). NOT public.
+#   (When a public webhook is needed later — e.g. the WhatsApp assistant — add a
+#    Cloudflare Tunnel route n8n.prsnl.fyi -> localhost:5678 and set WEBHOOK_URL
+#    to the https URL; keep the editor Tailscale-only.)
+# Secrets live in .env (chmod 600):
+#   N8N_ENCRYPTION_KEY  <- NEVER lose/rotate this; it encrypts all stored credentials
+#   N8N_DB_PASSWORD
+# Image pinned (no :latest) so Watchtower can't silently change it.
+
+services:
+  n8n-db:
+    image: postgres:16-alpine
+    container_name: n8n-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: ${N8N_DB_PASSWORD:?set in .env}
+      POSTGRES_DB: n8n
+    volumes:
+      - n8n-db-data:/var/lib/postgresql/data
+    networks: [n8n-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n -d n8n"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  n8n:
+    image: n8nio/n8n:2.22.6
+    container_name: n8n
+    restart: unless-stopped
+    depends_on:
+      n8n-db:
+        condition: service_healthy
+    ports:
+      - "100.103.66.92:5678:5678"   # Tailscale IP only — not 0.0.0.0/LAN, not public
+    environment:
+      # --- URLs / host (Tailscale access; transport encrypted by WireGuard) ---
+      - N8N_HOST=100.103.66.92
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - N8N_EDITOR_BASE_URL=http://100.103.66.92:5678/
+      - WEBHOOK_URL=http://100.103.66.92:5678/
+      - N8N_SECURE_COOKIE=false      # required for http access over a private IP
+      - GENERIC_TIMEZONE=Asia/Kolkata
+      - TZ=Asia/Kolkata
+      # --- secrets (from .env) ---
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:?set in .env}
+      # --- Postgres backend (robust under concurrent webhook executions) ---
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=n8n-db
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD:?set in .env}
+      # --- execution data pruning (keeps DB + disk bounded on a small host) ---
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168              # hours = 7 days
+      - EXECUTIONS_DATA_PRUNE_MAX_COUNT=10000
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=false
+      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem  # don't bloat the DB with binaries
+      # --- modern Code-node execution ---
+      - N8N_RUNNERS_ENABLED=true
+      # --- privacy / quiet ---
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      - N8N_HIRING_BANNER_ENABLED=false
+      # --- Node heap cap (~75% of the 1G container limit) so n8n can't starve MOC ---
+      - NODE_OPTIONS=--max-old-space-size=768
+    volumes:
+      - n8n-data:/home/node/.n8n
+    networks: [n8n-net]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5678/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+
+networks:
+  n8n-net:
+    name: n8n-net
+
+volumes:
+  n8n-data:
+  n8n-db-data:
