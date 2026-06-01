@@ -151,6 +151,21 @@ services:
         limits:
           memory: 64M
 
+  quip-discord-bot:
+    build:
+      context: ./quip
+      dockerfile: quip-discord-bot/Dockerfile
+    container_name: quip-discord-bot
+    restart: unless-stopped
+    env_file: quip-discord-bot.env
+    environment:
+      - N8N_INTERNAL_WEBHOOK=http://n8n:5678/webhook/quip
+    networks: [n8n-net]
+    deploy:
+      resources:
+        limits:
+          memory: 160M
+
 networks:
   n8n-net:
     name: n8n-net
