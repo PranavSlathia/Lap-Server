@@ -105,6 +105,69 @@ Source:
 - n8n binary data scaling reference: `https://docs.n8n.io/hosting/scaling/binary-data/`
 - n8n queue mode reference: `https://docs.n8n.io/hosting/scaling/queue-mode/`
 
+### Zie619/n8n-workflows
+
+Verdict: reference yay, import nay.
+
+Add window: after Quip Slice 1, when designing Slice 2+ workflows and the first real n8n exports.
+
+Review snapshot: repo checked on 2026-06-01. It is active, MIT-licensed, very popular, and last pushed 2026-05-31. GitHub metadata showed 54k+ stars and 7k+ forks. The latest release was a 2025-08-14 history rewrite for DMCA compliance, so treat provenance as mixed and use it for internal design reference only.
+
+What it is:
+
+- A large searchable corpus of n8n workflow JSONs and a small FastAPI/GitHub Pages browser.
+- The checked-out repo contained 2,061 workflow JSON files under `workflows/`; its generated site metadata advertised 4,343 workflows.
+- The corpus covers many nodes Quip will likely need later: Discord, schedule triggers, Respond to Webhook, Extract From File, Postgres, GitHub, OpenAI/LLM, HTTP Request, and workflow backup patterns.
+
+Why it matters:
+
+- Good inspiration library for Quip workflow structure once the Discord pipe is working.
+- Useful examples for digest-like scheduled workflows, Discord delivery, file extraction/OCR-adjacent flows, response formatting, n8n workflow export/backup, and error-node placement.
+- Useful negative examples too: it shows how quickly public webhooks, Code nodes, HTTP Request, Execute Command, and AI-agent/tool combinations expand the attack surface.
+
+Findings from local scan:
+
+| Signal | Count / note |
+|--------|--------------|
+| Workflow JSON files in clone | 2,061 |
+| Category directories | 188 |
+| Files with credential references | 1,752 |
+| Files with webhook IDs | 1,051 |
+| Files with `$env` expressions | 1,415 |
+| Files with execute-command references | 23 |
+| Files with AI-agent / LLM / MCP-ish references | 622 |
+| Common node types | HTTP Request, Code, Webhook, Respond to Webhook, Schedule Trigger, Extract From File, Postgres, Discord |
+
+Useful Quip searches to revisit:
+
+- Discord response patterns: `workflows/Webhook/*Discord*`, `workflows/Discord*`, `workflows/Discordtool*`.
+- Digest and scheduled work: `workflows/Schedule/*`, `workflows/Wait/*Schedule*`, `workflows/Http/*Schedule*`.
+- OCR/file intake structure: `workflows/Extractfromfile/*`, `workflows/Readbinaryfiles/*`, `workflows/Code/*Extractfromfile*`.
+- Workflow export/backup idea: `workflows/Code/0628_Code_Schedule_Export_Scheduled.json` and the Gitea variant.
+- Postgres/assistant data patterns: `workflows/Postgrestool/*`, `workflows/Postgres/*`.
+
+Do not copy wholesale:
+
+- Do not import any workflow directly into the live Dell n8n.
+- Do not activate imported webhooks or schedules without rebuilding triggers and auth.
+- Do not reuse credential IDs, credential names, webhook IDs, hardcoded repo names, public URLs, or environment references.
+- Do not copy Code, HTTP Request, Execute Command, Postgres, GitHub, or AI-agent tool chains without line-by-line review.
+- Do not treat generated metadata such as "production-ready", "excellent", or "optimized" as an assurance. It is labeling, not proof.
+
+Workflow intake rule:
+
+1. Use the repo as a pattern search library only.
+2. Copy the idea into a new Quip workflow; do not import the raw JSON as production.
+3. If importing for inspection, keep the workflow disabled and remove triggers first.
+4. Replace all credentials, webhook paths, URLs, environment expressions, schedule rules, and IDs.
+5. Review every Code, HTTP Request, database, file, Execute Command, AI Agent, and tool node before activation.
+6. Add redaction before Groq for any server, log, file, OCR, or third-party output.
+7. Export the final Quip workflow to the Quip repo and keep the Dell server docs in sync.
+
+Source:
+
+- `https://github.com/Zie619/n8n-workflows`
+
 ## Parked / Rejected
 
 These were reviewed and should not be reintroduced without a new product requirement.
