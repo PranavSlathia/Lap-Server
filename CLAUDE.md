@@ -299,7 +299,8 @@ Tailscale only (100.64.0.0/10 and/or services bound to `100.103.66.92`):
   9443  → Portainer
   9999  → Dozzle
   8011  → GlitchTip
-  19999 → Netdata
+  19999 → Netdata (also allowed from the n8n-net docker bridge `172.24.0.0/16` so the
+          Quip alert checker can read host disk/CPU metrics — Netdata is read-only)
 
 Internal or localhost-only:
   dh-pg (5436), dh-redis (6381), dh-api (8007), gt-pg, gt-redis,

@@ -149,6 +149,14 @@ Slice 3 — guarded server-action writes (all active): the agent calls **`propos
 
 Slice 4 — notes + keyword recall (all active): a new owner-scoped `notes` table in `quip-db` (`text`, `tags text[]`, a generated `tsvector` + GIN indexes; covered by the existing nightly backup) plus four agent tools — **`save_note`** (`quipSaveNote001`, auto-extracts `#hashtags` into `tags`), **`recall_notes`** (`quipRecallNot01`, ranked Postgres full-text search via `websearch_to_tsquery`, optional `#tag` filter), **`list_notes`** (`quipListNote001`), and **`delete_note`** (`quipDelNote0001`). FTS only (no embeddings on the Celeron yet) — the `text`/`tsv` column is left as a clean seam for a future `pgvector` semantic recall. No bot code change; replies pass through the existing `redact()` gate.
 
+Slice 5 — alerts + richer UX (all active). Tables `alert_state` + `followups` added to `quip-db`. Four pieces:
+- **Real-time incident alerts** — `quipAlertCheck1` cron (every 5 min) reads container health from the read-only docker-proxy + host disk/CPU from Netdata (via the n8n-net bridge gateway `172.24.0.1:19999`; a UFW rule allows `172.24.0.0/16 → :19999`), runs an `alertEval` state machine (`alert_state`: alert once per incident + 6h cooldown re-ping + recovery), and DMs the owner via `/send`. MOC / `quip-*` / n8n-core never alerted; clean stops (exit 0) ignored.
+- **Restart-target select menu** — bare `restart`/`stop`/`start` (no target) in the bot opens a `StringSelectMenu` of non-protected containers (options from the `quip-menu` webhook → `quipMenu00001`); picking one synthesizes `restart <target>` through the main pipe → existing Slice-3 Confirm/Cancel. Owner-only.
+- **Digest weather + news** — `quipDigest00001` now fetches Open-Meteo (Jammu) + Hacker News RSS and feeds a weather line + top-5 headlines into the digest agent. Calendar intentionally skipped.
+- **Post-action health follow-up** — `quipConfirm0001` enqueues a `followups` row (+3 min) after a successful restart/start; `quipFollowups1` cron (1 min) re-checks the container and DMs only if it's still unhealthy/down, then closes the row.
+
+Deferred items (digest rich embed, DH digest summaries, link summarization, semantic/graph recall, Send-and-Wait refactor, multi-user, GlitchTip error alerts) are tracked in the Quip repo's `docs/DEFERRED-BACKLOG.md`.
+
 Candidate community nodes, helper services, and self-hosting templates are tracked in `docs/N8N-INTEGRATION-SHORTLIST.md`. Treat that file as the gate before installing n8n community nodes or copying external compose patterns into the Dell stack.
 
 For external workflow libraries, the policy is stricter: use them as pattern references only. Do not import public workflow JSONs into the live Dell n8n without disabling triggers, replacing all credentials/IDs/URLs, and reviewing every Code, HTTP Request, database, file, Execute Command, and AI-agent tool node.
