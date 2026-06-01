@@ -213,7 +213,7 @@ Sentry-compatible — any service using the Sentry SDK can ship events here by s
 
 ### 4. n8n (workflow automation)
 
-**Access:** Tailscale-only at http://100.103.66.92:5678 (no Cloudflare route yet)
+**Access:** Tailscale at http://100.103.66.92:5678; also public at https://n8n.prsnl.fyi behind a Caddy HTTP Basic-Auth gate (`quip-n8n-gate`, 127.0.0.1:8090). Cloudflare Access was the intended gate but Zero Trust requires a card; the Caddy basic-auth proxy is the card-free perimeter. n8n's own owner login sits behind it.
 **Deployed:** 2026-06-01
 **Server path:** ~/docker/n8n/docker-compose.yml
 **Architecture doc:** docs/N8N-ARCHITECTURE.md
@@ -481,5 +481,6 @@ Single tunnel (`moc`), config at `/etc/cloudflared/config.yml`:
 | www.prsnl.fyi | localhost:8088 | prsnl-landing |
 | moc.prsnl.fyi | localhost:5173 | moc-web |
 | xd.prsnl.fyi | localhost:8005 | dh-web |
+| n8n.prsnl.fyi | localhost:8090 | quip-n8n-gate (Caddy Basic-Auth) → n8n |
 
 GlitchTip is intentionally Tailscale-only (no tunnel route).

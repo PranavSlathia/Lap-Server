@@ -166,6 +166,23 @@ services:
         limits:
           memory: 160M
 
+  # Basic-Auth gate in front of n8n for public access via n8n.prsnl.fyi.
+  # (Cloudflare Access needs a card; this is the card-free perimeter.)
+  # Caddyfile holds the bcrypt hash and is NOT committed (like the .env files).
+  quip-n8n-gate:
+    image: caddy:2-alpine
+    container_name: quip-n8n-gate
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8090:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    networks: [n8n-net]
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
 networks:
   n8n-net:
     name: n8n-net
