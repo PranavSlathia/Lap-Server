@@ -53,6 +53,7 @@ services:
       - N8N_EDITOR_BASE_URL=http://100.103.66.92:5678/
       - WEBHOOK_URL=http://100.103.66.92:5678/
       - N8N_SECURE_COOKIE=false      # required for http access over a private IP
+      - N8N_PROXY_HOPS=1             # trust 1 reverse-proxy hop (quip-n8n-gate Caddy); silences X-Forwarded-For warning
       - GENERIC_TIMEZONE=Asia/Kolkata
       - TZ=Asia/Kolkata
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
