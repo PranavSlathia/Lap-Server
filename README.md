@@ -123,7 +123,7 @@ Every project follows the same pattern:
 3. **All containers use** `restart: always` so they survive reboots
 4. **Database ports stay internal** to the Docker network — never exposed to the host
 5. **Public exposure** happens via Cloudflare Tunnel, not by opening firewall ports
-6. **Backups** run daily via cron (e.g., `~/docker/<project>/backup-db.sh` at 2 AM, 7-day retention)
+6. **Backups** run daily via systemd timers where available; MOC uses `moc-backup.timer` + restic, while new database projects should get an explicit backup timer and monitor.
 
 See `CLAUDE.md` for the full **Port Registry** before assigning new ports — no conflicts allowed across projects.
 
@@ -156,7 +156,7 @@ cloudflared tunnel route dns <tunnel-name> <subdomain>.prsnl.fyi
 sudo systemctl restart cloudflared
 
 # 8. Add Uptime Kuma monitor for the health endpoint
-# 9. Set up a backup cron if there's a database
+# 9. Set up a backup timer if there's a database
 # 10. Update CLAUDE.md with the new ports + project section
 ```
 
@@ -182,7 +182,7 @@ Lap-Server/
 └── scripts/
     ├── health-check.sh           Run a full server health check via SSH
     ├── deploy-compose.sh         Deploy docker-compose to the server
-    └── weekly-maintenance.sh     Comprehensive Sunday maintenance — runs as root cron, posts GitHub issue on warnings/critical
+    └── weekly-maintenance.sh     Comprehensive Sunday maintenance — runs as root cron, checks restic backup freshness, posts GitHub issue on warnings/critical
 ```
 
 ---

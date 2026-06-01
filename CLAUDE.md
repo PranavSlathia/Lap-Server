@@ -18,10 +18,10 @@ ssh pronav@100.103.66.92
 
 | Service | Local URL | Tailscale URL | Access | Purpose |
 |---------|-----------|---------------|--------|---------|
-| Portainer | https://192.168.1.18:9443 | https://100.103.66.92:9443 | LAN + Tailscale | Docker management UI |
-| Uptime Kuma | http://192.168.1.18:3001 | http://100.103.66.92:3001 | LAN + Tailscale | Uptime monitoring |
-| Dozzle | http://192.168.1.18:9999 | http://100.103.66.92:9999 | LAN + Tailscale | Live Docker log viewer |
-| Netdata | http://192.168.1.18:19999 | http://100.103.66.92:19999 | Tailscale only | Real-time system metrics |
+| Portainer | SSH tunnel only | https://100.103.66.92:9443 | Tailscale only | Docker management UI |
+| Uptime Kuma | SSH tunnel only | http://100.103.66.92:3001 | Tailscale only | Uptime monitoring |
+| Dozzle | SSH tunnel only | http://100.103.66.92:9999 | Tailscale only | Live Docker log viewer |
+| Netdata | SSH tunnel only | http://100.103.66.92:19999 | Tailscale only | Real-time system metrics |
 
 ---
 
@@ -36,29 +36,29 @@ ssh pronav@100.103.66.92
 | 22 | SSH | host | Public | Key-only auth, password disabled |
 | 80 | HTTP | host | Public | Reserved for Cloudflare |
 | 443 | HTTPS | host | Public | Reserved for Cloudflare |
-| 3001 | Uptime Kuma | uptime-kuma | LAN + Tailscale | Monitoring dashboard |
-| 5001 | Dockge | dockge | LAN + Tailscale | Compose stack manager |
-| 8000 | Portainer edge | portainer | LAN + Tailscale | Edge agent endpoint |
+| 3001 | Uptime Kuma | uptime-kuma | Tailscale only | Bound to `100.103.66.92` |
+| 5001 | Dockge | dockge | Tailscale only | Bound to `100.103.66.92` |
+| 8000 | Portainer edge | portainer | Tailscale only | Bound to `100.103.66.92` |
 | 8080 | Watchtower | watchtower | Internal | Health check only |
-| 8081 | pgweb | pgweb | LAN + Tailscale | Postgres web UI |
-| 9443 | Portainer | portainer | LAN + Tailscale | Docker management |
-| 9999 | Dozzle | dozzle | LAN + Tailscale | Log viewer |
+| 8081 | pgweb | pgweb | Tailscale only | Bound to `100.103.66.92` |
+| 9443 | Portainer | portainer | Tailscale only | Bound to `100.103.66.92` |
+| 9999 | Dozzle | dozzle | Tailscale only | Bound to `100.103.66.92` |
 | 19999 | Netdata | netdata | Tailscale only | System metrics |
 
 ### Project Ports
 
 | Port | Project | Service | Container | Access | Compose File |
 |------|---------|---------|-----------|--------|-------------|
-| 3000 | MindOverChatter | Hono backend API | moc-server-1 | Public (via tunnel) | ~/docker/moc/docker-compose.prod.yml |
+| 3000 | MindOverChatter | Hono backend API | moc-server | Localhost only | ~/docker/moc/docker-compose.prod.yml |
 | 5173 | MindOverChatter | React frontend (nginx) | moc-web | Public (via tunnel) | ~/docker/moc/docker-compose.prod.yml |
-| 5433 | MindOverChatter | PostgreSQL + pgvector | moc-db-1 | LAN + Tailscale | ~/docker/moc/docker-compose.prod.yml |
-| 6380 | MindOverChatter | FalkorDB (graph) | moc-falkordb-1 | LAN + Tailscale | ~/docker/moc/docker-compose.prod.yml |
-| 8004 | MindOverChatter | Embedding service | moc-embedding | LAN + Tailscale | ~/docker/moc/docker-compose.prod.yml |
-| 8006 | MindOverChatter | Graph consolidator | moc-graph-consolidator | LAN + Tailscale | ~/docker/moc/docker-compose.prod.yml |
-| 5436 | Domain Hunter | PostgreSQL + pgvector | dh-pg | LAN + Tailscale | ~/docker/domain-hunter/compose.yml |
-| 6381 | Domain Hunter | Redis | dh-redis | LAN + Tailscale | ~/docker/domain-hunter/compose.yml |
+| 5433 | MindOverChatter | PostgreSQL + pgvector | moc-db | Internal only | ~/docker/moc/docker-compose.prod.yml |
+| 6380 | MindOverChatter | FalkorDB fallback | moc-falkordb-1 | Tailscale only | ~/docker/moc/docker-compose.yml |
+| 8004 | MindOverChatter | Embedding service | moc-embedding | Localhost only | ~/docker/moc/docker-compose.prod.yml |
+| 8006 | MindOverChatter | Graph consolidator | moc-graph-consolidator | Localhost only | ~/docker/moc/docker-compose.prod.yml |
+| 5436 | Domain Hunter | PostgreSQL + pgvector | dh-pg | Localhost only | ~/docker/domain-hunter/compose.yml |
+| 6381 | Domain Hunter | Redis | dh-redis | Localhost only | ~/docker/domain-hunter/compose.yml |
 | 8005 | Domain Hunter | Web/dashboard | dh-web | Public (via tunnel) | ~/docker/domain-hunter/compose.yml |
-| 8007 | Domain Hunter | FastAPI API | dh-api | LAN + Tailscale | ~/docker/domain-hunter/compose.yml |
+| 8007 | Domain Hunter | FastAPI API | dh-api | Localhost only | ~/docker/domain-hunter/compose.yml |
 | 8011 | GlitchTip | Web (error tracking) | gt-web | Tailscale only | ~/docker/domain-hunter/glitchtip-compose.yml |
 | 8088 | prsnl-landing | nginx static | prsnl-landing | Public (via tunnel) | ~/docker/landing/ |
 
@@ -128,8 +128,8 @@ Browser → https://moc.prsnl.fyi
 - PostgreSQL 16 + pgvector extension
 - 25 tables, ~3MB data
 - Image pinned by SHA256 digest (Watchtower won't auto-update)
-- Daily backup at 2am: `~/docker/moc/backup-db.sh`
-- Backups kept 7 days: `~/docker/moc/backups/`
+- Daily backup: `moc-backup.timer` runs `~/bin/moc-backup-restic.sh`
+- Restic backup freshness is checked by weekly maintenance via `moc-backup.service`
 
 **AI Integration:**
 - Claude Code CLI v2.1.74 inside moc-server container
@@ -223,8 +223,9 @@ Sentry-compatible — any service using the Sentry SDK can ship events here by s
 ## OS & Software
 
 - Ubuntu Server 24.04 LTS (minimized)
-- Kernel: 6.8.0-107-generic
-- Docker: v29.3.1
+- Kernel: 6.8.0-124-generic
+- Docker: v29.5.2
+- Docker Compose: v5.1.4
 - Node.js: v22.22.2
 - Claude Code CLI: v2.1.92
 - GitHub CLI: v2.45.0 (authenticated as PranavSlathia)
@@ -259,20 +260,18 @@ Public access:
   localhost:<port> inside the host. Audit `sudo ufw status` before opening
   any new public port.
 
-LAN + Tailscale (192.168.1.0/24 + 100.64.0.0/10):
+Tailscale only (100.64.0.0/10 and/or services bound to `100.103.66.92`):
   3001  → Uptime Kuma
   5001  → Dockge
   8081  → pgweb
   9443  → Portainer
   9999  → Dozzle
-
-Tailscale only (100.64.0.0/10):
   8011  → GlitchTip
   19999 → Netdata
 
-Internal Docker networks only (no host binding or LAN-only):
-  dh-pg (5436), dh-redis (6381), gt-pg, gt-redis,
-  moc-db (5433), moc-falkordb (6380), moc-embedding (8004)
+Internal or localhost-only:
+  dh-pg (5436), dh-redis (6381), dh-api (8007), gt-pg, gt-redis,
+  moc-db, moc-server (3000), moc-embedding (8004), moc-graph-consolidator (8006)
 ```
 
 ## Security
@@ -295,7 +294,7 @@ Internal Docker networks only (no host binding or LAN-only):
 - Removes unused kernels and dependencies
 
 ### Container Security
-- Admin dashboards restricted to LAN + Tailscale (not public internet)
+- Admin dashboards restricted to Tailscale, with Docker published ports bound to `100.103.66.92` where possible
 - Database ports not exposed to host
 - Watchtower disabled for pinned DB images (SHA digest)
 - Docker log rotation: 10MB max, 3 files per container
@@ -371,7 +370,8 @@ Infrastructure compose: `~/docker/docker-compose.yml` (pgweb + dockge live in th
 | `~/docker/docker-compose.yml` | Infrastructure compose stack |
 | `~/docker/moc/docker-compose.prod.yml` | MOC project compose |
 | `~/docker/moc/.env` | MOC environment variables |
-| `~/docker/moc/backup-db.sh` | MOC DB backup script |
+| `~/bin/moc-backup-restic.sh` | MOC restic backup script |
+| `/etc/systemd/system/moc-backup.timer` | MOC daily backup timer |
 
 ## Adding a New Project
 
@@ -390,7 +390,7 @@ When deploying a new project to this server:
    sudo systemctl restart cloudflared
    ```
 8. **Add Uptime Kuma monitor** for health endpoint
-9. **Set up backup cron** if project has a database
+9. **Set up backup timer** if project has a database
 10. **Update this document** — add to Port Registry and Deployed Projects sections
 
 ## Troubleshooting
@@ -430,11 +430,11 @@ ssh pronav@192.168.1.18 "echo '=== UPTIME ===' && uptime && echo '=== MEMORY ===
 
 | Resource | Total | Used | Available | Notes (as of 2026-05-26) |
 |----------|-------|------|-----------|--------------------------|
-| RAM | 7.7 GB | ~4.8 GB | ~2.9 GB | MOC ~3.5GB · DH ~0.8GB · GT ~0.5GB · infra ~0.4GB · swap 2GB used |
-| Disk | 218 GB | ~41 GB | ~167 GB | Docker images 16GB · volumes 7.4GB · build cache 10GB |
-| CPU | 2 cores | load avg ~2.0 | At capacity | Celeron is the real bottleneck |
+| RAM | 7.7 GB | ~4-5 GB typical | ~3 GB typical | Keep new services lean; embedding is the largest workload |
+| Disk | 218 GB | ~41 GB | ~167 GB | Docker images ~14GB · volumes ~8GB · build cache ~9GB |
+| CPU | 2 cores | workload-dependent | Constrained | Celeron is the real bottleneck; avoid piling on crawlers/ML without offloading |
 
-When adding projects, budget ~500MB-2GB RAM per project depending on stack. RAM is now the tightest resource — adding another data-heavy project will likely require offloading something else.
+When adding projects, budget ~500MB-2GB RAM per project depending on stack and treat sustained 15-minute load over ~3.0 as a warning. The weekly maintenance script now flags CPU load pressure.
 
 ## Cloudflare Tunnel Routes
 

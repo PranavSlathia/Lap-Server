@@ -4,16 +4,22 @@ services:
     container_name: uptime-kuma
     restart: always
     ports:
-      - "3001:3001"
+      - "100.103.66.92:3001:3001"
     volumes:
       - uptime-kuma-data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3001 >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   dozzle:
     image: amir20/dozzle:latest
     container_name: dozzle
     restart: always
     ports:
-      - "9999:8080"
+      - "100.103.66.92:9999:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
@@ -48,11 +54,17 @@ services:
     container_name: portainer
     restart: always
     ports:
-      - "8000:8000"
-      - "9443:9443"
+      - "100.103.66.92:8000:8000"
+      - "100.103.66.92:9443:9443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
+    healthcheck:
+      test: ["CMD", "/portainer", "--version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
 volumes:
   uptime-kuma-data:

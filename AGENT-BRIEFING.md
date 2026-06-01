@@ -19,16 +19,22 @@ A Dell Vostro laptop running Ubuntu Server 24.04 LTS, repurposed as a developmen
 |------|---------|--------|
 | 22 | SSH | Public |
 | 80, 443 | Cloudflare | Public |
-| 3000 | MOC backend | Public (tunnel) |
-| 3001 | Uptime Kuma | LAN + Tailscale |
-| 5173 | MOC frontend | Public (tunnel) |
+| 3000 | MOC backend | Localhost only |
+| 3001 | Uptime Kuma | Tailscale only |
+| 5001 | Dockge | Tailscale only |
+| 5173 | MOC frontend | Public via Cloudflare Tunnel |
 | 5432 | MOC PostgreSQL | Internal only |
-| 8004 | MOC Mem0 | Internal only |
-| 9443 | Portainer | LAN + Tailscale |
-| 9999 | Dozzle | LAN + Tailscale |
+| 6380 | MOC FalkorDB fallback | Tailscale only |
+| 8004 | MOC embedding | Localhost only |
+| 8005 | Domain Hunter web | Public via Cloudflare Tunnel |
+| 8006 | MOC graph consolidator | Localhost only |
+| 8007 | Domain Hunter API | Localhost only |
+| 8081 | pgweb | Tailscale only |
+| 9443 | Portainer | Tailscale only |
+| 9999 | Dozzle | Tailscale only |
 | 19999 | Netdata | Tailscale only |
 
-**Available ranges:** 3100-3199, 4000-4999, 5174-5199, 5433-5499, 6000-7999, 8100-8999
+**Available ranges:** 3100-3199, 4000-4999, 5174-5435, 5437-5499, 6000-6379, 6382-7999, 8012-8999
 
 ## How to Access
 
@@ -51,8 +57,9 @@ ssh pronav@100.103.66.92
 | Local WiFi | 192.168.1.18 | When on same network (Airtel_renu_8079) |
 | Tailscale | 100.103.66.92 | When remote or unsure |
 
-- **Firewall (UFW) is active.** Open ports: 22, 80, 443, 3000, 3001, 5432, 8080, 9443, 9999
-- If your service needs a new port, run: `ssh pronav@192.168.1.18 "sudo ufw allow PORT_NUMBER"`
+- **Firewall (UFW) is active.** Public SSH is open; admin dashboards are Tailscale-only.
+- Docker-published ports must bind explicitly to `127.0.0.1` or `100.103.66.92`. Do not rely on UFW alone for Docker port exposure.
+- If your service needs a new admin port, prefer a Tailscale-IP bind over adding a broad UFW allow rule.
 - **Upload bandwidth:** ~42 Mbps (WiFi). Not a datacenter — fine for dev, not for high-traffic production.
 
 ## How to Deploy
@@ -63,7 +70,7 @@ Everything runs in Docker. The main compose file is at `~/docker/docker-compose.
 
 1. **Add it to the docker-compose.yml** on the server (or create a separate compose file in `~/docker/`)
 2. **Run:** `cd ~/docker && sudo docker compose up -d`
-3. **Open the port in UFW** if needed
+3. **Bind host ports explicitly** to `127.0.0.1` for tunnel-only services or `100.103.66.92` for Tailscale-only services
 4. All containers MUST use `restart: always` so they survive reboots
 
 ### To deploy a custom app (e.g., FastAPI backend):
@@ -81,7 +88,7 @@ services:
     container_name: my-backend
     restart: always
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - DATABASE_URL=postgresql://user:pass@postgres:5432/mydb
     depends_on:
@@ -119,7 +126,7 @@ Do NOT remove or modify these containers. They are infrastructure.
 ## Important Constraints
 
 ### Performance
-- **CPU is weak** (1.4GHz Celeron). Avoid CPU-heavy operations. Use `--cpus` limits in Docker if needed.
+- **CPU is weak** (1.4GHz Celeron). Avoid CPU-heavy operations. Use `--cpus` limits in Docker if needed, and treat sustained 15-minute load above ~3.0 as a capacity warning.
 - **RAM is limited** (8GB shared across everything). Keep containers lean. Use Alpine-based images where possible. Monitor with `free -h`.
 - **Disk is 240GB total.** Don't pull massive Docker images unnecessarily. Clean up with `docker system prune` periodically.
 
@@ -127,6 +134,7 @@ Do NOT remove or modify these containers. They are infrastructure.
 - This is a home server, NOT a datacenter. Power cuts and WiFi drops can happen.
 - All containers must use `restart: always`.
 - Store important data in Docker volumes (they survive container recreation).
+- Add a systemd backup timer for every database; MOC uses `moc-backup.timer` + restic.
 - The server auto-reboots at 4:00 AM if a kernel update requires it.
 - Watchtower auto-updates container images daily — if you need to pin a version, specify it explicitly (e.g., `postgres:16-alpine`, not `postgres:latest`).
 
@@ -138,8 +146,8 @@ Do NOT remove or modify these containers. They are infrastructure.
 
 ### Networking
 - The server gets a static IP (192.168.1.18) on WiFi but has no public IP.
-- To expose services to the internet: use **Cloudflare Tunnel** (not port forwarding).
-- For dev/testing: access via local IP or Tailscale IP directly.
+- To expose services to the internet: use **Cloudflare Tunnel** to a localhost-bound service, not port forwarding.
+- For dev/testing: access via SSH tunnel or Tailscale IP directly.
 
 ## File Locations on the Server
 

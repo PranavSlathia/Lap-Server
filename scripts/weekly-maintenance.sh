@@ -252,6 +252,15 @@ else                             heal "RAM at ${MEM_PCT}%, swap ${SWAP_PCT}%"
 fi
 [[ $SWAP_PCT -ge 50 ]] && warn "Swap at ${SWAP_PCT}% (heavy swapping)"
 
+# ── Check 15b: CPU load pressure ──────────────────────────────
+CPU_COUNT=$(nproc 2>/dev/null || echo 2)
+LOAD15=$(awk '{print $3}' /proc/loadavg)
+LOAD_PCT=$(awk -v loadavg="$LOAD15" -v cpu="$CPU_COUNT" 'BEGIN {printf "%.0f", (loadavg / cpu) * 100}')
+if   [[ $LOAD_PCT -ge 200 ]]; then crit "15m load ${LOAD15} on ${CPU_COUNT} CPUs (${LOAD_PCT}% capacity)"
+elif [[ $LOAD_PCT -ge 150 ]]; then warn "15m load ${LOAD15} on ${CPU_COUNT} CPUs (${LOAD_PCT}% capacity)"
+else                                heal "15m load ${LOAD15} on ${CPU_COUNT} CPUs (${LOAD_PCT}% capacity)"
+fi
+
 # ── Check 16: Log file sizes ───────────────────────────────────
 BIG_VAR_LOGS=$(find /var/log -type f -size +100M 2>/dev/null)
 if [[ -n "$BIG_VAR_LOGS" ]]; then
