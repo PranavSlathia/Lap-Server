@@ -399,6 +399,7 @@ Infrastructure compose: `~/docker/docker-compose.yml` (pgweb + dockge live in th
 | `/etc/systemd/logind.conf` | Lid close behavior |
 | `/etc/apt/apt.conf.d/50unattended-upgrades` | Auto-update settings |
 | `/etc/cloudflared/config.yml` | Cloudflare Tunnel routing |
+| `/etc/systemd/system/cloudflared.service.d/restart.conf` | `Restart=always` + `RestartSec=5` — auto-recover the tunnel if cloudflared exits (NB: `SIGHUP` stops cloudflared here; use `systemctl restart` to apply ingress changes) |
 | `/etc/sudoers.d/pronav` | Passwordless sudo |
 | `~/docker/docker-compose.yml` | Infrastructure compose stack |
 | `~/docker/moc/docker-compose.prod.yml` | MOC project compose |
