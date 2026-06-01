@@ -229,7 +229,8 @@ Config notes:
 - External task runners match n8n's official hosting pattern; native Python runner is enabled for Python Code nodes.
 - n8n and n8n-runners are pinned to uid/gid `1000:1000` and `no-new-privileges` so future image default changes do not accidentally run them as root.
 - Memory-capped (n8n 1G, runner 256M, db 256M) + `NODE_OPTIONS=--max-old-space-size=768` so it can't starve MOC.
-- `N8N_SECURE_COOKIE=false` (http over the Tailscale-encrypted transport); telemetry off; timezone Asia/Kolkata; Code-node env/file access hardened; images pinned (Watchtower won't touch them).
+- `N8N_SECURE_COOKIE=false` (http over the Tailscale-encrypted transport); telemetry off; metrics on at `/metrics`; timezone Asia/Kolkata; Code-node env/file access hardened; images pinned (Watchtower won't touch them).
+- Security policy is managed by env: personal-space sharing/publishing are disabled; MFA enforcement is explicitly off until the owner account has MFA configured.
 - n8n is dual-bound to `100.103.66.92:5678` and `127.0.0.1:5678`; it is still not LAN/public exposed.
 - Not using queue mode / Redis / worker processors yet; that is intentionally deferred until real workflow volume justifies the extra always-on services.
 - **To expose a public webhook** (e.g. for a WhatsApp/Meta integration): add a Cloudflare Tunnel route `n8n.prsnl.fyi → localhost:5678`, set `WEBHOOK_URL=https://n8n.prsnl.fyi/`, set `N8N_PROXY_HOPS=1`, and protect non-webhook paths with Cloudflare Access/WAF rules. A raw public tunnel exposes the editor too.

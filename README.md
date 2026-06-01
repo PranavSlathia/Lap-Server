@@ -203,7 +203,7 @@ Lap-Server/
 | MindOverChatter | https://moc.prsnl.fyi | React + Hono + PostgreSQL+pgvector + embedding + graph consolidator + FalkorDB |
 | Domain Hunter | https://xd.prsnl.fyi (Tailscale-only in practice) | FastAPI + SQLAlchemy + Postgres+pgvector + Redis + 5 workers |
 | GlitchTip | Tailscale: http://100.103.66.92:8011 | Self-hosted Sentry-compatible error tracking |
-| n8n | Tailscale: http://100.103.66.92:5678 | Workflow automation (n8n 2.22.6 + external runners + native Python runner + Postgres) |
+| n8n | Tailscale: http://100.103.66.92:5678 | Workflow automation (n8n 2.22.6 + external runners + native Python runner + Postgres + metrics) |
 
 ---
 
