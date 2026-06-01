@@ -64,7 +64,7 @@ Already covered on the Dell:
 - Filesystem binary mode for the current non-queue setup.
 - Metrics enabled.
 - Telemetry / personalization / version noise disabled.
-- n8n editor kept private on Tailscale, not exposed through a public reverse proxy.
+- n8n editor kept off raw-public: reachable over Tailscale, or via `n8n.prsnl.fyi` behind a Caddy HTTP Basic-Auth gate (`quip-n8n-gate`, approved 2026-06-01) — not an unauthenticated public reverse proxy.
 - Version-pinned n8n images, resource caps, non-root runtime user, and `no-new-privileges`.
 
 Useful lessons to add or keep in the backlog:
@@ -77,12 +77,12 @@ Useful lessons to add or keep in the backlog:
 | Queue-mode env parity | If queue mode is ever enabled, use a common env anchor for main + workers so DB, Redis, encryption key, security, and pruning settings cannot drift. | Only when queue mode is justified. |
 | Queue health checks | If queue mode is enabled, add Redis health checks and `QUEUE_HEALTH_CHECK_ACTIVE=true`; keep Redis internal-only and passworded. | Only with queue mode. |
 | Conservative worker scaling | Airat runs two workers at concurrency 10. On the Dell, start at one worker with concurrency 1-2 and scale only from measured execution backlog. | Only with queue mode. |
-| Reverse-proxy SSE handling | If an Access-gated HTTPS n8n route is added later, preserve Caddy/nginx SSE behavior (`flush_interval -1` equivalent), add `X-Robots-Tag: noindex`, and keep the editor behind auth. | Only if a public/Access-gated editor route is explicitly approved. |
+| Reverse-proxy SSE handling | **Implemented 2026-06-01** in `quip-n8n-gate`: Caddy `flush_interval -1` + `X-Robots-Tag: noindex`, editor behind HTTP Basic-Auth. (`/rest/settings` returns 200 through the gate.) | Done for the basic-auth gate; re-apply the same pattern if ever swapped to Cloudflare Access. |
 | SMTP recovery | Consider SMTP only for account recovery / notifications. It is not needed for Quip Slice 1 and introduces another secret to manage. | Optional, after owner account setup. |
 
 Do not copy wholesale:
 
-- It exposes the full n8n app through Caddy on public 80/443. The Dell design keeps the editor Tailscale-only.
+- It exposes the full n8n app through Caddy on public 80/443 with no auth gate. The Dell gate (`quip-n8n-gate`) instead binds `127.0.0.1:8090`, sits behind the Cloudflare Tunnel, and requires HTTP Basic-Auth (plus n8n's own owner login) — never raw-public.
 - It also publishes `5678:5678`; the Dell compose must stay bound to `127.0.0.1` and `100.103.66.92`, never `0.0.0.0`.
 - It uses floating tags (`caddy:latest`, `redis:alpine`, `postgres:17`, `n8nio/n8n:stable`). The Dell stack should stay version-pinned.
 - Its retention defaults are too large for the Dell (`60` days and `1,000,000` executions). Current Dell retention is intentionally `7` days / `10,000`.
@@ -92,11 +92,11 @@ Do not copy wholesale:
 
 Cherry-pick checklist:
 
-- Keep the current Tailscale-only editor and localhost origin.
+- Keep the editor access-controlled (Tailscale + the `quip-n8n-gate` basic-auth gate) and the localhost origin; never raw-public.
 - Keep resource caps before adding any worker/Redis surface.
 - If queue mode is revisited, decide binary storage first. n8n queue mode and local filesystem binary storage are a known design conflict for this server.
 - Consider adapting the backup-before-update idea, but wire it into the existing restic/weekly-maintenance model.
-- Keep Caddy/SSE notes only for a future Cloudflare Access-gated editor or public webhook route; do not expose the editor by default.
+- The Caddy/SSE pattern is now live in `quip-n8n-gate` (HTTP Basic-Auth, not Cloudflare Access — Zero Trust required a card). Still binding rules: no unauthenticated public editor, and no public Quip webhook.
 
 Source:
 

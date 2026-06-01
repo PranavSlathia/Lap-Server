@@ -10,9 +10,9 @@ Last updated: 2026-06-01.
 |------|-------|
 | Server path | `~/docker/n8n/` |
 | Repo mirror | `docker/n8n/docker-compose.yml` |
-| Editor access | `http://100.103.66.92:5678` over Tailscale |
-| Local origin | `http://127.0.0.1:5678` for host-local health checks / future tunnel origins |
-| Public route | None |
+| Editor access | `http://100.103.66.92:5678` over Tailscale; also `https://n8n.prsnl.fyi` behind a Caddy HTTP Basic-Auth gate (`quip-n8n-gate`) — approved 2026-06-01 |
+| Local origin | `http://127.0.0.1:5678` for host-local health checks / tunnel origin |
+| Public route | `https://n8n.prsnl.fyi` → Cloudflare Tunnel → `quip-n8n-gate` (Caddy basic-auth, bound `127.0.0.1:8090`) → `n8n:5678`; gated, never raw |
 | n8n image | `n8nio/n8n:2.22.6` |
 | runner image | `n8nio/runners:2.22.6` |
 | database image | `postgres:16-alpine` |
@@ -33,6 +33,9 @@ Live containers:
 flowchart LR
   Owner["Owner devices on Tailscale"] -->|HTTP :5678| Tailscale["100.103.66.92"]
   Health["Host-local checks"] -->|HTTP :5678| Localhost["127.0.0.1"]
+  OffNet["Owner off-tailnet"] -->|HTTPS| CF["Cloudflare Tunnel n8n.prsnl.fyi"]
+  CF --> Gate["quip-n8n-gate (Caddy basic-auth, 127.0.0.1:8090)"]
+  Gate --> N8N
   Tailscale --> N8N["n8n container"]
   Localhost --> N8N
   N8N -->|Postgres| DB["n8n-db"]
@@ -40,7 +43,7 @@ flowchart LR
   Runner -->|task results| N8N
 ```
 
-There is intentionally no public Cloudflare route for the editor. Docker-published ports bind to `100.103.66.92` and `127.0.0.1`, never `0.0.0.0`.
+The editor is reachable over Tailscale and, since 2026-06-01, via `https://n8n.prsnl.fyi` behind a Caddy HTTP Basic-Auth gate (`quip-n8n-gate`). The n8n container's own published ports still bind only to `100.103.66.92` and `127.0.0.1`, never `0.0.0.0`; the public path is the gate (bound `127.0.0.1:8090`) fronted by the Cloudflare Tunnel. There is no raw/unauthenticated public editor exposure. (Cloudflare Access was the intended gate, but Zero Trust requires a payment card; the Caddy basic-auth proxy is the card-free perimeter, with n8n's own owner login behind it.)
 
 ## Runtime Configuration
 
@@ -109,7 +112,7 @@ Secrets:
 
 ## Quip / Discord Integration Plan
 
-Quip is the planned Discord assistant product. n8n is the orchestration layer, but the editor must remain private.
+Quip is the planned Discord assistant product. n8n is the orchestration layer; the editor must remain access-controlled (Tailscale, or `n8n.prsnl.fyi` behind the Caddy basic-auth gate) — never raw-public.
 
 Target traffic model:
 
@@ -124,7 +127,7 @@ flowchart LR
 Hard requirements for Quip:
 
 - No public Quip webhook in v1. The Discord bot connects outbound to Discord and calls n8n internally.
-- n8n editor and REST API remain Tailscale-only.
+- n8n editor and REST API are never raw-public: reachable over Tailscale, or via `n8n.prsnl.fyi` behind the Caddy HTTP Basic-Auth gate (approved 2026-06-01). No unauthenticated public route.
 - Discord owner/guild/channel allowlist and Discord event dedupe happen before n8n workflow execution.
 - Prefer Discord slash commands so Message Content privileged intent is not needed in v1.
 - n8n uses credentials for Groq and service APIs; Code nodes must not read secrets from `$env`.
@@ -152,15 +155,16 @@ Queue mode adds Redis, workers, and more operational surface. It is the major sc
 
 ### Public HTTPS Host Vars
 
-Do not set these yet:
+`n8n.prsnl.fyi` now exists (gated public editor, approved 2026-06-01), but these are intentionally **left unset / at the Tailscale values**:
 
 ```env
+# NOT set — would pin n8n to a single base URL and degrade the Tailscale path
 N8N_HOST=n8n.prsnl.fyi
 N8N_PROTOCOL=https
 WEBHOOK_URL=https://n8n.prsnl.fyi/
 ```
 
-Those are correct only if a public n8n hostname exists. The current design deliberately has no public n8n route. For Discord-based Quip v1, no public webhook hostname is needed because the bot sidecar uses Discord Gateway/interactions and calls n8n internally.
+n8n supports only one base URL; setting these to the public host can break CSRF/absolute links on the Tailscale path (the documented primary admin route). The editor works over **both** paths via relative URLs + the gate's Caddy SSE handling (`flush_interval -1`, verified `/rest/settings` 200 through the gate). Set the public host vars only if off-tailnet editing actually misbehaves after owner signup — accepting that it makes the public host primary. For Quip v1 the bot calls n8n's webhook **internally**, so no public webhook hostname is needed regardless.
 
 ### ntfy
 
