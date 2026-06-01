@@ -185,6 +185,25 @@ services:
         limits:
           memory: 64M
 
+  # Quip Slice 2 data layer: reminders, processed_events, messages. Internal-only.
+  quip-db:
+    image: postgres:16-alpine
+    container_name: quip-db
+    restart: unless-stopped
+    env_file: quip-db.env
+    volumes:
+      - quip-db-data:/var/lib/postgresql/data
+    networks: [n8n-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quip -d quip"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
 networks:
   n8n-net:
     name: n8n-net
@@ -192,3 +211,4 @@ networks:
 volumes:
   n8n-data:
   n8n-db-data:
+  quip-db-data:
