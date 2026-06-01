@@ -209,32 +209,24 @@ if docker ps --format '{{.Names}}' | grep -q '^moc-db$'; then
   PG_SIZE=$(docker exec moc-db psql -U moc -d moc -tAc "SELECT pg_size_pretty(pg_database_size('moc'));" 2>/dev/null | tr -d '[:space:]')
   [[ -z "$PG_SIZE" ]] && PG_SIZE="?"
   LAST_VAC=$(docker exec moc-db psql -U moc -d moc -tAc "SELECT max(greatest(last_vacuum, last_autovacuum)) FROM pg_stat_user_tables;" 2>/dev/null | tr -d '[:space:]')
-  LAST_BACKUP=$(ls -1t "$USER_HOME"/docker/moc/backups/*.dump 2>/dev/null | head -1)
-  if [[ -n "$LAST_BACKUP" ]]; then
-    BACKUP_AGE_HOURS=$(( ( $(date +%s) - $(stat -c %Y "$LAST_BACKUP") ) / 3600 ))
-    if [[ $BACKUP_AGE_HOURS -gt 36 ]]; then warn "Last DB backup is ${BACKUP_AGE_HOURS}h old (>36h)"
-    else                                    heal "Postgres ${PG_SIZE}, last backup ${BACKUP_AGE_HOURS}h ago"
+  # MOC moved from pg_dump files to restic via moc-backup.service/.timer (2026-05).
+  BK_RESULT=$(systemctl show moc-backup.service -p Result --value 2>/dev/null)
+  BK_FINISH=$(systemctl show moc-backup.service -p ExecMainExitTimestamp --value 2>/dev/null)
+  if [[ -n "$BK_FINISH" ]]; then
+    BACKUP_AGE_HOURS=$(( ( $(date +%s) - $(date -d "$BK_FINISH" +%s) ) / 3600 ))
+    if [[ "$BK_RESULT" != "success" ]]; then crit "MOC restic backup last run result=${BK_RESULT} (${BACKUP_AGE_HOURS}h ago)"
+    elif [[ $BACKUP_AGE_HOURS -gt 36 ]];   then warn "MOC restic backup is ${BACKUP_AGE_HOURS}h old (>36h)"
+    else                                        heal "Postgres ${PG_SIZE}, restic backup ${BACKUP_AGE_HOURS}h ago"
     fi
   else
-    warn "No DB backup file found in ~/docker/moc/backups"
+    warn "moc-backup.service has no successful run recorded (restic backup may be failing)"
   fi
 else
   warn "moc-db container not running"
 fi
 
-# ── Check 13: Mem0 reachable from moc-server ──────────────────
-if docker ps --format '{{.Names}}' | grep -q '^moc-server$'; then
-  if docker exec moc-server sh -c 'wget -q -O- --timeout=3 http://moc-memory:11434/ 2>&1 || curl -s --max-time 3 http://moc-memory:11434/ 2>&1' >/dev/null 2>&1; then
-    heal "moc-server can reach moc-memory on internal network"
-  else
-    # Fallback: just check moc-memory container is up
-    if docker ps --format '{{.Names}}' | grep -q '^moc-memory$'; then
-      heal "moc-memory container is up (deep reachability check inconclusive)"
-    else
-      crit "moc-memory container not running"
-    fi
-  fi
-fi
+# ── Check 13: Mem0 decommissioned (graph-first cutover 2026-05-05) ──
+# Previously checked moc-memory reachability; removed after Mem0 retirement.
 
 # ── Check 14: Watchtower polling ──────────────────────────────
 if docker ps --format '{{.Names}}' | grep -q '^watchtower$'; then
