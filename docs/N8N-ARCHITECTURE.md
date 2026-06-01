@@ -132,6 +132,8 @@ Planned sidecars, not live yet:
 | `quip-discord-bot` | Discord slash command handling, allowlist, dedupe, n8n callback | internal only; outbound to Discord |
 | `quip-docker-proxy` | Read-only Docker API for container status | internal `n8n-net` only |
 
+Candidate community nodes, helper services, and self-hosting templates are tracked in `docs/N8N-INTEGRATION-SHORTLIST.md`. Treat that file as the gate before installing n8n community nodes or copying external compose patterns into the Dell stack.
+
 ## Deferred Choices
 
 ### Queue Mode

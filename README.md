@@ -178,7 +178,8 @@ Lap-Server/
 ├── AGENT-BRIEFING.md      Quick context for AI agents deploying to this server
 ├── SOS-RUNBOOK.md         Break-glass incident and recovery guide
 ├── docs/
-│   └── N8N-ARCHITECTURE.md   Detailed n8n runtime, security, Quip, and ntfy decisions
+│   ├── N8N-ARCHITECTURE.md   Detailed n8n runtime, security, Quip, and ntfy decisions
+│   └── N8N-INTEGRATION-SHORTLIST.md   Yay/nay backlog for n8n nodes, helpers, and templates
 ├── configs/               Sanitized snapshots of server config files
 │   ├── docker-daemon.json
 │   ├── fail2ban-jail.local
@@ -207,7 +208,7 @@ Lap-Server/
 | GlitchTip | Tailscale: http://100.103.66.92:8011 | Self-hosted Sentry-compatible error tracking |
 | n8n | Tailscale: http://100.103.66.92:5678 | Workflow automation (n8n 2.22.6 + external runners + native Python runner + Postgres + metrics) |
 
-Detailed n8n notes live in `docs/N8N-ARCHITECTURE.md`.
+Detailed n8n notes live in `docs/N8N-ARCHITECTURE.md`; candidate add-ons and external templates are tracked in `docs/N8N-INTEGRATION-SHORTLIST.md`.
 
 ---
 
