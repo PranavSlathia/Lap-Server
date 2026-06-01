@@ -131,6 +131,28 @@ services:
         limits:
           memory: 256M
 
+  quip-docker-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    container_name: quip-docker-proxy
+    restart: unless-stopped
+    environment:
+      # read-only: list/inspect containers only. Everything else denied.
+      CONTAINERS: 1
+      INFO: 1
+      PING: 1
+      POST: 0          # no write verbs (no restart yet — that's Slice 3)
+      EXEC: 0
+      IMAGES: 0
+      NETWORKS: 0
+      VOLUMES: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [n8n-net]
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
 networks:
   n8n-net:
     name: n8n-net
