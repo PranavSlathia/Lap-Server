@@ -48,6 +48,8 @@ Verdict: reference yay, not a drop-in deploy.
 
 Add window: after Quip Slice 1, during the next n8n infra-hardening review.
 
+Review snapshot: repo checked on 2026-06-01. The default branch was `main`, last pushed 2026-04-14, with 10 stars / 4 forks. Treat it as a small but useful reference template, not as a mature upstream dependency.
+
 Why it matters:
 
 - Shows a clean queue-mode topology: main n8n process, Redis, Postgres, and worker replicas.
@@ -55,6 +57,28 @@ Why it matters:
 - Includes useful security/env examples: settings-file permissions, file access restriction, Git bare-repo blocking, env access blocking, diagnostics off, metrics on, and queue health checks.
 - Includes filesystem binary storage, Postgres backup script, and backup-before-update workflow.
 - Caddy config includes the important SSE-friendly `flush_interval -1` reverse-proxy pattern.
+
+Already covered on the Dell:
+
+- Postgres backend instead of SQLite.
+- Filesystem binary mode for the current non-queue setup.
+- Metrics enabled.
+- Telemetry / personalization / version noise disabled.
+- n8n editor kept private on Tailscale, not exposed through a public reverse proxy.
+- Version-pinned n8n images, resource caps, non-root runtime user, and `no-new-privileges`.
+
+Useful lessons to add or keep in the backlog:
+
+| Lesson from AiratTop | Dell action | Timing |
+|----------------------|-------------|--------|
+| Backup before updates | Add an n8n update wrapper that refuses to pull/recreate if the `n8n-db` backup fails, records image versions, then runs the update. Use restic/off-host storage, not just a local dump. | After the n8n-db nightly backup exists. |
+| Dedicated workflow file area | Add a `/files` mount plus `N8N_RESTRICT_FILE_ACCESS_TO=/files` before enabling workflows that read/write local files or OCR attachments. This limits file-node blast radius. | Before OCR/file-heavy Quip workflows. |
+| Git-node hardening | Add `N8N_GIT_NODE_DISABLE_BARE_REPOS=true` in the next compose-hardening pass, after rendering config successfully. | Low-risk future compose update. |
+| Queue-mode env parity | If queue mode is ever enabled, use a common env anchor for main + workers so DB, Redis, encryption key, security, and pruning settings cannot drift. | Only when queue mode is justified. |
+| Queue health checks | If queue mode is enabled, add Redis health checks and `QUEUE_HEALTH_CHECK_ACTIVE=true`; keep Redis internal-only and passworded. | Only with queue mode. |
+| Conservative worker scaling | Airat runs two workers at concurrency 10. On the Dell, start at one worker with concurrency 1-2 and scale only from measured execution backlog. | Only with queue mode. |
+| Reverse-proxy SSE handling | If an Access-gated HTTPS n8n route is added later, preserve Caddy/nginx SSE behavior (`flush_interval -1` equivalent), add `X-Robots-Tag: noindex`, and keep the editor behind auth. | Only if a public/Access-gated editor route is explicitly approved. |
+| SMTP recovery | Consider SMTP only for account recovery / notifications. It is not needed for Quip Slice 1 and introduces another secret to manage. | Optional, after owner account setup. |
 
 Do not copy wholesale:
 
@@ -64,6 +88,7 @@ Do not copy wholesale:
 - Its retention defaults are too large for the Dell (`60` days and `1,000,000` executions). Current Dell retention is intentionally `7` days / `10,000`.
 - Its worker scale is heavy for the Celeron (`2` workers, concurrency `10`). The Dell should not move there without measured execution volume.
 - Its backup is only a local compressed `pg_dump`; Dell still needs restic/off-host backup and a restore drill.
+- Its update script uses `docker compose down`, which is unnecessary downtime for the Dell unless the update specifically requires a full stop. Prefer backup, pull/build, `up -d`, health check, and rollback notes.
 
 Cherry-pick checklist:
 
@@ -76,6 +101,9 @@ Cherry-pick checklist:
 Source:
 
 - `https://github.com/AiratTop/n8n-self-hosted`
+- n8n security env reference: `https://docs.n8n.io/hosting/configuration/environment-variables/security/`
+- n8n binary data scaling reference: `https://docs.n8n.io/hosting/scaling/binary-data/`
+- n8n queue mode reference: `https://docs.n8n.io/hosting/scaling/queue-mode/`
 
 ## Parked / Rejected
 

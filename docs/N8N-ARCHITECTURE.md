@@ -55,6 +55,12 @@ Core deployment choices:
 - Telemetry, personalization prompts, version notifications, and hiring banner disabled.
 - `NODE_OPTIONS=--max-old-space-size=768` to keep Node heap below the 1 GiB container cap.
 
+Next hardening items from the integration shortlist:
+
+- Add `N8N_GIT_NODE_DISABLE_BARE_REPOS=true` during the next compose-hardening pass.
+- Add a dedicated `/files` mount plus `N8N_RESTRICT_FILE_ACCESS_TO=/files` before workflows need local file read/write or OCR attachment processing.
+- Add an n8n update wrapper that takes and verifies an off-host/restic-backed `n8n-db` backup before image pulls or container recreation.
+
 Execution retention is intentionally still debug-friendly:
 
 ```env
@@ -244,7 +250,9 @@ Losing `N8N_ENCRYPTION_KEY` means credentials stored in n8n are unrecoverable ev
 ## References
 
 - n8n environment variables: `https://docs.n8n.io/hosting/configuration/environment-variables/`
+- n8n security environment variables: `https://docs.n8n.io/hosting/configuration/environment-variables/security/`
 - n8n execution data pruning: `https://docs.n8n.io/hosting/scaling/execution-data/`
+- n8n binary data scaling: `https://docs.n8n.io/hosting/scaling/binary-data/`
 - n8n queue mode: `https://docs.n8n.io/hosting/scaling/queue-mode/`
 - n8n metrics: `https://docs.n8n.io/hosting/configuration/configuration-examples/prometheus/`
 - ntfy configuration and auth: `https://docs.ntfy.sh/config/`
