@@ -204,6 +204,23 @@ services:
         limits:
           memory: 256M
 
+  # Slice 3: the SOLE docker-write path. Internal-only, token-gated; performs ONLY
+  # restart/start/stop (non-protected) + cleanup. Mounts the socket (runs as root).
+  quip-action-executor:
+    build:
+      context: ./quip
+      dockerfile: quip-action-executor/Dockerfile
+    container_name: quip-action-executor
+    restart: unless-stopped
+    env_file: quip-action-executor.env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [n8n-net]
+    deploy:
+      resources:
+        limits:
+          memory: 96M
+
 networks:
   n8n-net:
     name: n8n-net
