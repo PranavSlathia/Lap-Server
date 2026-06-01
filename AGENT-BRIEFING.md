@@ -24,7 +24,7 @@ A Dell Vostro laptop running Ubuntu Server 24.04 LTS, repurposed as a developmen
 | 5001 | Dockge | Tailscale only |
 | 5173 | MOC frontend | Public via Cloudflare Tunnel |
 | 5433 | MOC PostgreSQL | Internal only |
-| 5678 | n8n (workflow automation) | Tailscale only |
+| 5678 | n8n (workflow automation) | Tailscale + localhost |
 | 6380 | MOC FalkorDB fallback | Tailscale only |
 | 8004 | MOC embedding | Localhost only |
 | 8005 | Domain Hunter web | Public via Cloudflare Tunnel |

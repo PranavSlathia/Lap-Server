@@ -152,7 +152,7 @@ Expected Docker-published local addresses:
 Probe from the Mac when validating LAN exposure:
 
 ```bash
-for p in 3001 5001 8000 8004 8006 8007 8011 8081 9443 9999 19999; do
+for p in 3001 5001 5678 8000 8004 8006 8007 8011 8081 9443 9999 19999; do
   nc -vz -G 2 192.168.1.18 "$p"
 done
 ```

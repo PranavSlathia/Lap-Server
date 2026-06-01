@@ -63,9 +63,9 @@ ssh pronav@100.103.66.92
 | 8007 | Domain Hunter | FastAPI API | dh-api | Localhost only | ~/docker/domain-hunter/compose.yml |
 | 8011 | GlitchTip | Web (error tracking) | gt-web | Tailscale only | ~/docker/domain-hunter/glitchtip-compose.yml |
 | 8088 | prsnl-landing | nginx static | prsnl-landing | Public (via tunnel) | ~/docker/landing/ |
-| 5678 | n8n | Workflow automation UI/API | n8n | Tailscale only | ~/docker/n8n/docker-compose.yml |
+| 5678 | n8n | Workflow automation UI/API | n8n | Tailscale + localhost | ~/docker/n8n/docker-compose.yml |
 
-**Workers (no host ports):** dh-scheduler, dh-worker-{a2,rdap,wayback,classifier,scoring}, gt-worker, gt-pg (internal 5432), gt-redis (internal 6379), moc-worker, n8n-db (internal 5432).
+**Workers (no host ports):** dh-scheduler, dh-worker-{a2,rdap,wayback,classifier,scoring}, gt-worker, gt-pg (internal 5432), gt-redis (internal 6379), moc-worker, n8n-runners, n8n-db (internal 5432).
 
 ### Available Port Ranges for New Projects
 
@@ -216,18 +216,20 @@ Sentry-compatible — any service using the Sentry SDK can ship events here by s
 **Access:** Tailscale-only at http://100.103.66.92:5678 (no Cloudflare route yet)
 **Deployed:** 2026-06-01
 **Server path:** ~/docker/n8n/docker-compose.yml
-**Env file:** ~/docker/n8n/.env (chmod 600) — `N8N_ENCRYPTION_KEY` (never lose/rotate — encrypts all stored credentials), `N8N_DB_PASSWORD`
+**Env file:** ~/docker/n8n/.env (chmod 600) — `N8N_ENCRYPTION_KEY` (never lose/rotate — encrypts all stored credentials), `N8N_DB_PASSWORD`, `N8N_RUNNERS_AUTH_TOKEN`
 
 | Container | Image | Port | Status |
 |-----------|-------|------|--------|
 | n8n | n8nio/n8n:2.22.6 (pinned) | 5678 | Editor + webhook/execution engine |
+| n8n-runners | n8nio/runners:2.22.6 (pinned) | (internal 5679 broker) | External Code-node task runner |
 | n8n-db | postgres:16-alpine | (internal 5432) | Workflow / credential / execution store |
 
 Config notes:
 - Postgres backend (not SQLite) for concurrency safety; execution data pruned at 7 days / 10k max; binary data on filesystem (keeps DB small).
-- Memory-capped (n8n 1G, db 256M) + `NODE_OPTIONS=--max-old-space-size=768` so it can't starve MOC.
-- `N8N_SECURE_COOKIE=false` (http over the Tailscale-encrypted transport); telemetry off; timezone Asia/Kolkata; task runners on; image pinned (Watchtower won't touch it).
-- **To expose a public webhook** (e.g. for a WhatsApp/Meta integration): add a Cloudflare Tunnel route `n8n.prsnl.fyi → localhost:5678`, set `WEBHOOK_URL=https://n8n.prsnl.fyi/`, and keep the editor Tailscale-only.
+- Memory-capped (n8n 1G, runner 256M, db 256M) + `NODE_OPTIONS=--max-old-space-size=768` so it can't starve MOC.
+- `N8N_SECURE_COOKIE=false` (http over the Tailscale-encrypted transport); telemetry off; timezone Asia/Kolkata; external task runners on; Code-node env/file access hardened; images pinned (Watchtower won't touch them).
+- n8n is dual-bound to `100.103.66.92:5678` and `127.0.0.1:5678`; it is still not LAN/public exposed.
+- **To expose a public webhook** (e.g. for a WhatsApp/Meta integration): add a Cloudflare Tunnel route `n8n.prsnl.fyi → localhost:5678`, set `WEBHOOK_URL=https://n8n.prsnl.fyi/`, set `N8N_PROXY_HOPS=1`, and protect non-webhook paths with Cloudflare Access/WAF rules. A raw public tunnel exposes the editor too.
 
 ---
 
@@ -286,6 +288,7 @@ Public access:
 Tailscale only (100.64.0.0/10 and/or services bound to `100.103.66.92`):
   3001  → Uptime Kuma
   5001  → Dockge
+  5678  → n8n (also bound to 127.0.0.1 for local tunnel origin)
   8081  → pgweb
   9443  → Portainer
   9999  → Dozzle
@@ -294,7 +297,8 @@ Tailscale only (100.64.0.0/10 and/or services bound to `100.103.66.92`):
 
 Internal or localhost-only:
   dh-pg (5436), dh-redis (6381), dh-api (8007), gt-pg, gt-redis,
-  moc-db, moc-server (3000), moc-embedding (8004), moc-graph-consolidator (8006)
+  moc-db, moc-server (3000), moc-embedding (8004), moc-graph-consolidator (8006),
+  n8n-runners (5679), n8n-db
 ```
 
 ## Security
