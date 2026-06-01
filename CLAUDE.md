@@ -405,6 +405,8 @@ Infrastructure compose: `~/docker/docker-compose.yml` (pgweb + dockge live in th
 | `~/docker/moc/.env` | MOC environment variables |
 | `~/bin/moc-backup-restic.sh` | MOC restic backup script |
 | `/etc/systemd/system/moc-backup.timer` | MOC daily backup timer |
+| `~/bin/quip-db-backup.sh` | Quip DB (quip-db) restic backup script — repo `~/backups/restic-quip`, key `~/.restic-quip.key` |
+| `/etc/systemd/system/quip-db-backup.timer` | Quip DB nightly backup timer (03:25 UTC) |
 
 ## Adding a New Project
 
