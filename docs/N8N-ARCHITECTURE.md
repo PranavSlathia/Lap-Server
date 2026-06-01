@@ -134,12 +134,15 @@ Hard requirements for Quip:
 - Tool outputs are redacted before reaching Groq.
 - MOC remains excluded from every action.
 
-Planned sidecars, not live yet:
+Live Quip sidecars (Slice 1 + Slice 2, as of 2026-06-02):
 
-| Service | Purpose | Suggested exposure |
-|---------|---------|--------------------|
-| `quip-discord-bot` | Discord slash command handling, allowlist, dedupe, n8n callback | internal only; outbound to Discord |
+| Service | Purpose | Exposure |
+|---------|---------|----------|
+| `quip-discord-bot` | Discord `/quip` + @mention + DM handling, allowlist, dedupe, n8n callback, **internal `POST /send`** (`:8787`) for proactive delivery | internal only; outbound to Discord; no host port |
 | `quip-docker-proxy` | Read-only Docker API for container status | internal `n8n-net` only |
+| `quip-db` | Postgres 16 — reminders / processed_events / messages (Slice 2) | internal `n8n-net` only; nightly restic backup (`quip-db-backup.timer`) |
+
+Slice 2 n8n workflows (all active): `Quip` (main agent, Fireworks DeepSeek-V4-Flash), `get_container_status` (MOC-filtered, redacted), `set/list/cancel_reminder` (Postgres tools), `Quip Scheduler` (1-min cron → due reminders → bot `/send`), `Quip Digest` (09:00 IST → status → `/send`). Reminders fire proactively to Discord via the bot `/send` endpoint (bearer-gated, owner/guild allowlist). The docker-socket-proxy stays read-only; only Slice 3 will introduce guarded server-action writes.
 
 Candidate community nodes, helper services, and self-hosting templates are tracked in `docs/N8N-INTEGRATION-SHORTLIST.md`. Treat that file as the gate before installing n8n community nodes or copying external compose patterns into the Dell stack.
 
