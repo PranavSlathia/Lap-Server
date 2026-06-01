@@ -9,9 +9,9 @@ A Dell Vostro laptop running Ubuntu Server 24.04 LTS, repurposed as a developmen
 - **Hostname:** prsnl
 - **OS:** Ubuntu Server 24.04 LTS (minimized install)
 - **CPU:** Intel Celeron 2957U @ 1.4GHz (2 cores, 2 threads) — it's slow, optimize accordingly
-- **RAM:** 8 GB total (~7.2 GB available)
-- **Disk:** 240GB Kingston SSD (~200GB free)
-- **Docker:** v29.3.1 — ALL apps run as Docker containers, no bare-metal installs
+- **RAM:** 8 GB total (7.7 GB usable; check `free -h` before adding heavy services)
+- **Disk:** 240GB Kingston SSD (218GB usable; check `df -h /` before large image pulls)
+- **Docker:** v29.5.2 — ALL apps run as Docker containers, no bare-metal installs
 
 ## Port Registry — CHECK BEFORE USING ANY PORT
 
@@ -23,7 +23,7 @@ A Dell Vostro laptop running Ubuntu Server 24.04 LTS, repurposed as a developmen
 | 3001 | Uptime Kuma | Tailscale only |
 | 5001 | Dockge | Tailscale only |
 | 5173 | MOC frontend | Public via Cloudflare Tunnel |
-| 5432 | MOC PostgreSQL | Internal only |
+| 5433 | MOC PostgreSQL | Internal only |
 | 6380 | MOC FalkorDB fallback | Tailscale only |
 | 8004 | MOC embedding | Localhost only |
 | 8005 | Domain Hunter web | Public via Cloudflare Tunnel |
@@ -98,8 +98,8 @@ services:
     image: postgres:16-alpine
     container_name: postgres
     restart: always
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     environment:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=pass
@@ -148,6 +148,7 @@ Do NOT remove or modify these containers. They are infrastructure.
 - The server gets a static IP (192.168.1.18) on WiFi but has no public IP.
 - To expose services to the internet: use **Cloudflare Tunnel** to a localhost-bound service, not port forwarding.
 - For dev/testing: access via SSH tunnel or Tailscale IP directly.
+- For incidents and recovery work, start with this repo's `SOS-RUNBOOK.md`.
 
 ## File Locations on the Server
 
@@ -164,9 +165,9 @@ Do NOT remove or modify these containers. They are infrastructure.
 Run this to verify the server is healthy:
 
 ```bash
-ssh pronav@192.168.1.18 "echo '=== UPTIME ===' && uptime && echo '=== MEMORY ===' && free -h && echo '=== DISK ===' && df -h / && echo '=== DOCKER ===' && sudo docker ps --format 'table {{.Names}}\t{{.Status}}' && echo '=== SERVICES ===' && for s in ssh docker fail2ban wpa_supplicant ufw tailscaled; do echo \"\$s: \$(sudo systemctl is-active \$s)\"; done"
+ssh pronav@192.168.1.18 "echo '=== UPTIME ===' && uptime && echo '=== MEMORY ===' && free -h && echo '=== DISK ===' && df -h / && echo '=== DOCKER ===' && sudo docker ps --format 'table {{.Names}}\t{{.Status}}' && echo '=== SERVICES ===' && for s in ssh docker fail2ban wpa_supplicant ufw tailscaled cloudflared cron; do echo \"\$s: \$(sudo systemctl is-active \$s)\"; done"
 ```
 
 ## Questions?
 
-If you need to know something not covered here, SSH into the server and investigate. You have full root access. If something breaks, check Dozzle (port 9999) for container logs or run `journalctl -xe` for system logs.
+If you need to know something not covered here, SSH into the server and investigate. You have full root access. If something breaks, start with `SOS-RUNBOOK.md`, then check Dozzle through Tailscale (port 9999) for container logs or run `journalctl -xe` for system logs.

@@ -83,7 +83,7 @@ This particular Dell Vostro has an Intel Celeron 2957U (1.4GHz, 2 cores), 8GB RA
 ### How traffic flows
 
 - **Public users** → `https://<sub>.prsnl.fyi` → Cloudflare Edge → Tunnel → host's `cloudflared` → respective nginx/web container on a private port.
-- **Admin (you)** → SSH or Tailscale → host directly → all services on private ports (only reachable via LAN or Tailscale).
+- **Admin (you)** → SSH or Tailscale → host directly → dashboards and admin services bound to Tailscale or reachable through SSH tunnels.
 
 No port forwarding on your home router. Cloudflare Tunnel makes the connection outbound-only.
 
@@ -170,7 +170,9 @@ A more detailed walkthrough lives in `AGENT-BRIEFING.md` — designed for AI age
 Lap-Server/
 ├── README.md              You are here
 ├── CLAUDE.md              Full reference: port registry, deployed projects, troubleshooting
+├── AGENTS.md              Codex/agent operating guide, kept aligned with CLAUDE.md
 ├── AGENT-BRIEFING.md      Quick context for AI agents deploying to this server
+├── SOS-RUNBOOK.md         Break-glass incident and recovery guide
 ├── configs/               Sanitized snapshots of server config files
 │   ├── docker-daemon.json
 │   ├── fail2ban-jail.local
@@ -192,7 +194,7 @@ Lap-Server/
 | Project | URL | Stack |
 |---------|-----|-------|
 | prsnl-landing | https://prsnl.fyi | nginx static landing page |
-| MindOverChatter | https://moc.prsnl.fyi | React + Hono + PostgreSQL+pgvector + Mem0 + FalkorDB |
+| MindOverChatter | https://moc.prsnl.fyi | React + Hono + PostgreSQL+pgvector + embedding + graph consolidator + FalkorDB |
 | Domain Hunter | https://xd.prsnl.fyi (Tailscale-only in practice) | FastAPI + SQLAlchemy + Postgres+pgvector + Redis + 5 workers |
 | GlitchTip | Tailscale: http://100.103.66.92:8011 | Self-hosted Sentry-compatible error tracking |
 
@@ -209,5 +211,7 @@ cd Lap-Server
 ./scripts/health-check.sh           # from home WiFi
 ./scripts/health-check.sh tailscale # from anywhere
 ```
+
+For outages or recovery work, start with `SOS-RUNBOOK.md`.
 
 Then read `CLAUDE.md` for everything else.

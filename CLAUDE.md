@@ -2,6 +2,8 @@
 
 This repo manages the Dell Vostro laptop converted into an Ubuntu home server on 2026-04-06.
 
+For incidents and recovery work, start with `SOS-RUNBOOK.md`.
+
 ## Quick Access
 
 ```bash
@@ -102,8 +104,8 @@ Static marketing/landing page. No DB, no backend.
 | Container | Image | Port | Status | Notes |
 |-----------|-------|------|--------|-------|
 | moc-web | nginx:alpine | 5173 | Running | React SPA + reverse proxy |
-| moc-server-1 | moc-server (custom) | 3000 | Running (healthy) | Hono backend |
-| moc-db-1 | pgvector/pgvector:pg16 | 5433 | Running (healthy) | PostgreSQL + pgvector |
+| moc-server | moc-server (custom) | 3000 | Running (healthy) | Hono backend |
+| moc-db | pgvector/pgvector:pg16 | 5433 | Running (healthy) | PostgreSQL + pgvector |
 | moc-falkordb-1 | falkordb/falkordb | 6380 | Running (healthy) | Knowledge graph store |
 | moc-embedding | moc-embedding (custom) | 8004 | Running (healthy) | Embedding service (~3.5GB) |
 | moc-worker | moc-worker (custom) | (internal) | Running | Background work |
@@ -144,7 +146,7 @@ Browser → https://moc.prsnl.fyi
 # On the server
 cd ~/docker/moc
 git pull
-docker compose -f docker-compose.prod.yml build server memory
+docker compose -f docker-compose.prod.yml build server embedding worker graph-consolidator
 docker compose -f docker-compose.prod.yml up -d
 
 # For frontend changes (build locally, transfer dist):
@@ -193,14 +195,14 @@ Self-hosted expired-domain discovery + scoring pipeline. Ingest GitHub README ci
 ### 3. GlitchTip (self-hosted error tracking)
 
 **Access:** Tailscale-only at http://100.103.66.92:8011 (no Cloudflare route)
-**Deployed:** 2026-05-17 (~9 days ago)
+**Deployed:** 2026-05-17
 **Server path:** ~/docker/domain-hunter/glitchtip-compose.yml (cohabits dh project dir)
 **Env file:** ~/docker/domain-hunter/.glitchtip.env
 
 | Container | Image | Port | Status |
 |-----------|-------|------|--------|
-| gt-web | glitchtip/glitchtip:latest | 8011 | Web UI + API |
-| gt-worker | glitchtip/glitchtip:latest | — | Celery worker |
+| gt-web | glitchtip/glitchtip@sha256:f45485d296697531464b4484ee9bb40a51a774df820f74128a2b2ae0c5a0b00f | 8011 | Web UI + API |
+| gt-worker | glitchtip/glitchtip@sha256:f45485d296697531464b4484ee9bb40a51a774df820f74128a2b2ae0c5a0b00f | — | Celery worker |
 | gt-pg | postgres:16 | (internal 5432) | Event/issue store |
 | gt-redis | redis:7-alpine | (internal 6379) | Celery broker |
 
@@ -394,6 +396,8 @@ When deploying a new project to this server:
 10. **Update this document** — add to Port Registry and Deployed Projects sections
 
 ## Troubleshooting
+
+For incidents, use `SOS-RUNBOOK.md` first. The checks below are quick references.
 
 ### Can't SSH into server
 1. `ping 192.168.1.18` (local) or `ping 100.103.66.92` (Tailscale)
