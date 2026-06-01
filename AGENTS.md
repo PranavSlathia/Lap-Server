@@ -226,9 +226,12 @@ Sentry-compatible — any service using the Sentry SDK can ship events here by s
 
 Config notes:
 - Postgres backend (not SQLite); execution data pruned at 7 days / 10k max; binary data on filesystem.
+- External task runners match n8n's official hosting pattern; native Python runner is enabled for Python Code nodes.
+- n8n and n8n-runners are pinned to uid/gid `1000:1000` and `no-new-privileges` so future image default changes do not accidentally run them as root.
 - Memory-capped (n8n 1G, runner 256M, db 256M) + `NODE_OPTIONS=--max-old-space-size=768` so it can't starve MOC.
-- `N8N_SECURE_COOKIE=false` (http over Tailscale's encrypted transport); telemetry off; timezone Asia/Kolkata; external task runners on; Code-node env/file access hardened; images pinned.
+- `N8N_SECURE_COOKIE=false` (http over Tailscale's encrypted transport); telemetry off; timezone Asia/Kolkata; Code-node env/file access hardened; images pinned.
 - n8n is dual-bound to `100.103.66.92:5678` and `127.0.0.1:5678`; it is still not LAN/public exposed.
+- Not using queue mode / Redis / worker processors yet; that is intentionally deferred until real workflow volume justifies the extra always-on services.
 - **Public webhook later** (e.g. WhatsApp/Meta): add Cloudflare Tunnel `n8n.prsnl.fyi → localhost:5678`, set `WEBHOOK_URL=https://n8n.prsnl.fyi/`, set `N8N_PROXY_HOPS=1`, and protect non-webhook paths with Cloudflare Access/WAF rules. A raw public tunnel exposes the editor too.
 
 ---

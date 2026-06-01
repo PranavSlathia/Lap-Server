@@ -36,7 +36,10 @@ services:
   n8n:
     image: n8nio/n8n:2.22.6
     container_name: n8n
+    user: "1000:1000"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       n8n-db:
         condition: service_healthy
@@ -105,7 +108,10 @@ services:
   n8n-runners:
     image: n8nio/runners:2.22.6
     container_name: n8n-runners
+    user: "1000:1000"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       n8n:
         condition: service_healthy
