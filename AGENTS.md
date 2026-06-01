@@ -234,8 +234,8 @@ Config notes:
 - Security policy is managed by env: personal-space sharing/publishing are disabled; MFA enforcement is explicitly off until the owner account has MFA configured.
 - n8n is dual-bound to `100.103.66.92:5678` and `127.0.0.1:5678`; it is still not LAN/public exposed.
 - Not using queue mode / Redis / worker processors yet; that is intentionally deferred until real workflow volume justifies the extra always-on services.
-- ntfy is a future infra-alert rail only; do not make it part of Quip v1 or use it as a WhatsApp template workaround.
-- **Public webhook later** (e.g. WhatsApp/Meta): add Cloudflare Tunnel `n8n.prsnl.fyi → localhost:5678`, set `WEBHOOK_URL=https://n8n.prsnl.fyi/`, set `N8N_PROXY_HOPS=1`, and protect non-webhook paths with Cloudflare Access/WAF rules. A raw public tunnel exposes the editor too.
+- ntfy is a future infra-alert rail only; do not make it part of Quip v1.
+- Quip is now Discord-first. Prefer a `quip-discord-bot` sidecar that connects outbound to Discord and calls n8n internally; do not expose a public n8n webhook for Quip v1.
 
 ---
 

@@ -64,7 +64,7 @@ EXECUTIONS_DATA_SAVE_ON_PROGRESS=false
 EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=false
 ```
 
-After the first Quip/WhatsApp workflows are stable, the safe optimization is:
+After the first Quip Discord workflows are stable, the safe optimization is:
 
 ```env
 EXECUTIONS_DATA_SAVE_ON_SUCCESS=none
@@ -99,36 +99,37 @@ Secrets:
 
 - `N8N_ENCRYPTION_KEY` must never be lost or rotated casually; it encrypts stored n8n credentials.
 - `N8N_DB_PASSWORD` and `N8N_RUNNERS_AUTH_TOKEN` live only in `~/docker/n8n/.env`.
-- `.env` and future secret files such as `quip-gatekeeper.env` must remain chmod `600` and uncommitted.
+- `.env` and future secret files such as `quip-discord-bot.env` must remain chmod `600` and uncommitted.
 
-## Quip / WhatsApp Integration Plan
+## Quip / Discord Integration Plan
 
-Quip is the planned WhatsApp assistant product. n8n is the orchestration layer, but the editor must remain private.
+Quip is the planned Discord assistant product. n8n is the orchestration layer, but the editor must remain private.
 
-Target public ingress:
+Target traffic model:
 
 ```mermaid
 flowchart LR
-  Meta["WhatsApp Cloud API"] --> CF["Cloudflare Tunnel"]
-  CF -->|only /webhook/*| Gatekeeper["quip-gatekeeper on localhost"]
-  Gatekeeper -->|authorized event| N8NInternal["n8n internal webhook on n8n-net"]
-  N8NInternal --> Tools["Groq, Docker proxy, Postgres, Meta send API"]
+  Discord["Discord private server/channel"] -->|Gateway / interactions| Bot["quip-discord-bot sidecar"]
+  Bot -->|authorized event| N8NInternal["n8n internal webhook on n8n-net"]
+  N8NInternal --> Tools["Groq, Docker proxy, Postgres, GlitchTip"]
+  Bot -->|reply / follow-up| Discord
 ```
 
 Hard requirements for Quip:
 
-- Public route goes to a small `quip-gatekeeper`, not directly to n8n.
-- Cloudflare ingress must path-lock to `/webhook/*`; root paths must hit the 404 catch-all.
+- No public Quip webhook in v1. The Discord bot connects outbound to Discord and calls n8n internally.
 - n8n editor and REST API remain Tailscale-only.
-- Meta HMAC verification, sender allowlist, and `wamid` dedupe happen before n8n workflow execution.
-- n8n uses credentials for Groq and Meta send tokens; Code nodes must not read secrets from `$env`.
+- Discord owner/guild/channel allowlist and Discord event dedupe happen before n8n workflow execution.
+- Prefer Discord slash commands so Message Content privileged intent is not needed in v1.
+- n8n uses credentials for Groq and service APIs; Code nodes must not read secrets from `$env`.
 - Tool outputs are redacted before reaching Groq.
+- MOC remains excluded from every action.
 
 Planned sidecars, not live yet:
 
 | Service | Purpose | Suggested exposure |
 |---------|---------|--------------------|
-| `quip-gatekeeper` | Meta webhook handshake, HMAC verify, allowlist, dedupe | `127.0.0.1:8090` only |
+| `quip-discord-bot` | Discord slash command handling, allowlist, dedupe, n8n callback | internal only; outbound to Discord |
 | `quip-docker-proxy` | Read-only Docker API for container status | internal `n8n-net` only |
 
 ## Deferred Choices
@@ -149,7 +150,7 @@ N8N_PROTOCOL=https
 WEBHOOK_URL=https://n8n.prsnl.fyi/
 ```
 
-Those are correct only if a public n8n hostname exists. The current design deliberately has no public n8n route. For Quip, the public hostname should route to the gatekeeper and only for `/webhook/*`.
+Those are correct only if a public n8n hostname exists. The current design deliberately has no public n8n route. For Discord-based Quip v1, no public webhook hostname is needed because the bot sidecar uses Discord Gateway/interactions and calls n8n internally.
 
 ### ntfy
 
@@ -165,9 +166,8 @@ Good future uses:
 
 Do not use ntfy as:
 
-- A WhatsApp template workaround.
 - The Quip command interface.
-- A replacement for Quip's 9 am WhatsApp digest and reminders.
+- A replacement for Quip's 9 am Discord digest and reminders.
 
 If deployed later, make it private by default:
 

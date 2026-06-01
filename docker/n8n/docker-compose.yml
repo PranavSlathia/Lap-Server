@@ -1,10 +1,8 @@
 # n8n — self-hosted workflow automation.
 # Access: Tailscale-only editor UI (http://100.103.66.92:5678). NOT public.
 # The 127.0.0.1 bind is for host-local health checks and future tunnel origin use.
-#   (When a public webhook is needed later — e.g. the WhatsApp assistant — add a
-#    Cloudflare Tunnel route n8n.prsnl.fyi -> localhost:5678, set WEBHOOK_URL
-#    to the https URL, set N8N_PROXY_HOPS=1, and protect non-webhook paths with
-#    Cloudflare Access/WAF rules. A raw public tunnel exposes the editor too.)
+#   Quip is Discord-first: run a small bot sidecar that connects outbound to
+#   Discord and calls n8n internally. Do not expose a public n8n webhook for v1.
 # Secrets live in .env (chmod 600):
 #   N8N_ENCRYPTION_KEY  <- NEVER lose/rotate this; it encrypts all stored credentials
 #   N8N_DB_PASSWORD
