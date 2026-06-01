@@ -134,15 +134,18 @@ Hard requirements for Quip:
 - Tool outputs are redacted before reaching Groq.
 - MOC remains excluded from every action.
 
-Live Quip sidecars (Slice 1 + Slice 2, as of 2026-06-02):
+Live Quip sidecars (Slice 1 + Slice 2 + Slice 3, as of 2026-06-02):
 
 | Service | Purpose | Exposure |
 |---------|---------|----------|
-| `quip-discord-bot` | Discord `/quip` + @mention + DM handling, allowlist, dedupe, n8n callback, **internal `POST /send`** (`:8787`) for proactive delivery | internal only; outbound to Discord; no host port |
-| `quip-docker-proxy` | Read-only Docker API for container status | internal `n8n-net` only |
-| `quip-db` | Postgres 16 — reminders / processed_events / messages (Slice 2) | internal `n8n-net` only; nightly restic backup (`quip-db-backup.timer`) |
+| `quip-discord-bot` | Discord `/quip` + @mention + DM handling, allowlist, dedupe, n8n callback, **internal `POST /send`** (`:8787`) for proactive delivery, Confirm/Cancel buttons + `confirm/cancel <token>` text (owner-only) | internal only; outbound to Discord; no host port |
+| `quip-docker-proxy` | Read-only Docker API for container status (`POST 0`, `EXEC 0`) | internal `n8n-net` only |
+| `quip-db` | Postgres 16 — reminders / processed_events / messages / **pending_actions** (Slice 3 audit) | internal `n8n-net` only; nightly restic backup (`quip-db-backup.timer`) |
+| `quip-action-executor` | **Sole docker-write path** (Slice 3): bearer-gated Node sidecar over `/var/run/docker.sock`; whitelist `restart/start/stop/cleanup`; refuses MOC + `quip-*` + n8n-core; resolves hash-prefixed container names | internal `n8n-net` only; **no host port**; runs as root for socket access |
 
-Slice 2 n8n workflows (all active): `Quip` (main agent, Fireworks DeepSeek-V4-Flash), `get_container_status` (MOC-filtered, redacted), `set/list/cancel_reminder` (Postgres tools), `Quip Scheduler` (1-min cron → due reminders → bot `/send`), `Quip Digest` (09:00 IST → status → `/send`). Reminders fire proactively to Discord via the bot `/send` endpoint (bearer-gated, owner/guild allowlist). The docker-socket-proxy stays read-only; only Slice 3 will introduce guarded server-action writes.
+Slice 2 n8n workflows (all active): `Quip` (main agent, Fireworks DeepSeek-V4-Flash), `get_container_status` (MOC-filtered, redacted), `set/list/cancel_reminder` (Postgres tools), `Quip Scheduler` (1-min cron → due reminders → bot `/send`), `Quip Digest` (09:00 IST → status → `/send`). Reminders fire proactively to Discord via the bot `/send` endpoint (bearer-gated, owner/guild allowlist).
+
+Slice 3 — guarded server-action writes (all active): the agent calls **`propose_action`** (`quipProposeAct1`) for any restart/start/stop/cleanup; it validates the whitelist + protected-set (MOC / `quip-*` / n8n-core refused), mints a short confirm token, stages a `pending_actions` row, and returns the token for the bot to attach Confirm/Cancel buttons. A separate **no-LLM `Quip Confirm`** workflow (`quipConfirm0001`, webhook `quip-confirm`) looks up the token (scoped to `user_id`), checks pending + unexpired, and on **execute** calls `quip-action-executor` (httpHeaderAuth cred `quipActCred0001`) then marks the row `executed`; cancel/expiry/used/non-owner all refuse without acting. Nothing runs without an explicit owner confirmation. The docker-socket-proxy itself remains read-only — the only write path is the audited, token-gated `quip-action-executor`.
 
 Candidate community nodes, helper services, and self-hosting templates are tracked in `docs/N8N-INTEGRATION-SHORTLIST.md`. Treat that file as the gate before installing n8n community nodes or copying external compose patterns into the Dell stack.
 
