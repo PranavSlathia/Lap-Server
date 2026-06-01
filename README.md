@@ -177,6 +177,8 @@ Lap-Server/
 ├── AGENTS.md              Codex/agent operating guide, kept aligned with CLAUDE.md
 ├── AGENT-BRIEFING.md      Quick context for AI agents deploying to this server
 ├── SOS-RUNBOOK.md         Break-glass incident and recovery guide
+├── docs/
+│   └── N8N-ARCHITECTURE.md   Detailed n8n runtime, security, Quip, and ntfy decisions
 ├── configs/               Sanitized snapshots of server config files
 │   ├── docker-daemon.json
 │   ├── fail2ban-jail.local
@@ -204,6 +206,8 @@ Lap-Server/
 | Domain Hunter | https://xd.prsnl.fyi (Tailscale-only in practice) | FastAPI + SQLAlchemy + Postgres+pgvector + Redis + 5 workers |
 | GlitchTip | Tailscale: http://100.103.66.92:8011 | Self-hosted Sentry-compatible error tracking |
 | n8n | Tailscale: http://100.103.66.92:5678 | Workflow automation (n8n 2.22.6 + external runners + native Python runner + Postgres + metrics) |
+
+Detailed n8n notes live in `docs/N8N-ARCHITECTURE.md`.
 
 ---
 

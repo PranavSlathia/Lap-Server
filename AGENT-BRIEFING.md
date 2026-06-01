@@ -37,6 +37,8 @@ A Dell Vostro laptop running Ubuntu Server 24.04 LTS, repurposed as a developmen
 
 **Available ranges:** 3100-3199, 4000-4999, 5174-5435, 5437-5499, 6000-6379, 6382-7999, 8012-8999
 
+For n8n-specific runtime, security, Quip/WhatsApp, and ntfy decisions, read `docs/N8N-ARCHITECTURE.md` before changing `~/docker/n8n/`.
+
 ## How to Access
 
 ```bash

@@ -216,6 +216,7 @@ Sentry-compatible — any service using the Sentry SDK can ship events here by s
 **Access:** Tailscale-only at http://100.103.66.92:5678 (no Cloudflare route yet)
 **Deployed:** 2026-06-01
 **Server path:** ~/docker/n8n/docker-compose.yml
+**Architecture doc:** docs/N8N-ARCHITECTURE.md
 **Env file:** ~/docker/n8n/.env (chmod 600) — `N8N_ENCRYPTION_KEY` (never lose/rotate — encrypts all stored credentials), `N8N_DB_PASSWORD`, `N8N_RUNNERS_AUTH_TOKEN`
 
 | Container | Image | Port | Status |
@@ -233,6 +234,7 @@ Config notes:
 - Security policy is managed by env: personal-space sharing/publishing are disabled; MFA enforcement is explicitly off until the owner account has MFA configured.
 - n8n is dual-bound to `100.103.66.92:5678` and `127.0.0.1:5678`; it is still not LAN/public exposed.
 - Not using queue mode / Redis / worker processors yet; that is intentionally deferred until real workflow volume justifies the extra always-on services.
+- ntfy is a future infra-alert rail only; do not make it part of Quip v1 or use it as a WhatsApp template workaround.
 - **To expose a public webhook** (e.g. for a WhatsApp/Meta integration): add a Cloudflare Tunnel route `n8n.prsnl.fyi → localhost:5678`, set `WEBHOOK_URL=https://n8n.prsnl.fyi/`, set `N8N_PROXY_HOPS=1`, and protect non-webhook paths with Cloudflare Access/WAF rules. A raw public tunnel exposes the editor too.
 
 ---
