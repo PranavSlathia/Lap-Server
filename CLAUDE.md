@@ -24,6 +24,7 @@ ssh pronav@100.103.66.92
 | Uptime Kuma | SSH tunnel only | http://100.103.66.92:3001 | Tailscale only | Uptime monitoring |
 | Dozzle | SSH tunnel only | http://100.103.66.92:9999 | Tailscale only | Live Docker log viewer |
 | Netdata | SSH tunnel only | http://100.103.66.92:19999 | Tailscale only | Real-time system metrics |
+| Phoenix | SSH tunnel only | http://100.103.66.92:6006 | Tailscale only | LLM trace observability (Quip brain) |
 
 ---
 
@@ -45,7 +46,11 @@ ssh pronav@100.103.66.92
 | 8081 | pgweb | pgweb | Tailscale only | Bound to `100.103.66.92` |
 | 9443 | Portainer | portainer | Tailscale only | Bound to `100.103.66.92` |
 | 9999 | Dozzle | dozzle | Tailscale only | Bound to `100.103.66.92` |
-| 19999 | Netdata | netdata | Tailscale only | System metrics |
+| 19999 | Netdata | netdata | Tailscale only | System metrics (+ allowed from n8n-net `172.24.0.0/16` for Quip alert checker) |
+
+> **Gotcha:** a Docker `ports: "X:X"` publish binds `0.0.0.0` and **bypasses UFW** (DOCKER iptables
+> chain), so "UFW doesn't allow it" ≠ "not exposed" — it's LAN-reachable. Always bind admin UIs to
+> `100.103.66.92:` or `127.0.0.1:` explicitly. (Phoenix made this mistake; fixed 2026-06-11.)
 
 ### Project Ports
 
@@ -54,18 +59,24 @@ ssh pronav@100.103.66.92
 | 3000 | MindOverChatter | Hono backend API | moc-server | Localhost only | ~/docker/moc/docker-compose.prod.yml |
 | 5173 | MindOverChatter | React frontend (nginx) | moc-web | Public (via tunnel) | ~/docker/moc/docker-compose.prod.yml |
 | 5433 | MindOverChatter | PostgreSQL + pgvector | moc-db | Internal only | ~/docker/moc/docker-compose.prod.yml |
-| 6380 | MindOverChatter | FalkorDB fallback | moc-falkordb-1 | Tailscale only | ~/docker/moc/docker-compose.yml |
 | 8004 | MindOverChatter | Embedding service | moc-embedding | Localhost only | ~/docker/moc/docker-compose.prod.yml |
 | 8006 | MindOverChatter | Graph consolidator | moc-graph-consolidator | Localhost only | ~/docker/moc/docker-compose.prod.yml |
 | 5436 | Domain Hunter | PostgreSQL + pgvector | dh-pg | Localhost only | ~/docker/domain-hunter/compose.yml |
 | 6381 | Domain Hunter | Redis | dh-redis | Localhost only | ~/docker/domain-hunter/compose.yml |
-| 8005 | Domain Hunter | Web/dashboard | dh-web | Public (via tunnel) | ~/docker/domain-hunter/compose.yml |
 | 8007 | Domain Hunter | FastAPI API | dh-api | Localhost only | ~/docker/domain-hunter/compose.yml |
-| 8011 | GlitchTip | Web (error tracking) | gt-web | Tailscale only | ~/docker/domain-hunter/glitchtip-compose.yml |
 | 8088 | prsnl-landing | nginx static | prsnl-landing | Public (via tunnel) | ~/docker/landing/ |
 | 5678 | n8n | Workflow automation UI/API | n8n | Tailscale + localhost | ~/docker/n8n/docker-compose.yml |
+| 8090 | Quip | Caddy basic-auth gate → n8n | quip-n8n-gate | Localhost (tunnel origin) | ~/docker/n8n/docker-compose.yml |
+| 6006 | Quip/observability | Phoenix LLM-trace UI + OTLP | phoenix | Tailscale only (`100.103.66.92`) | ~/docker/phoenix/docker-compose.yml |
+| 8790 | Quip | quip-agents `/run` bridge (host systemd, not docker) | — | n8n-net only (`172.24.0.0/16`, bearer-gated) | /home/agent/quip-agents |
 
-**Workers (no host ports):** dh-scheduler, dh-worker-{a2,rdap,wayback,classifier,scoring}, gt-worker, gt-pg (internal 5432), gt-redis (internal 6379), moc-worker, n8n-runners, n8n-db (internal 5432).
+**Graph store note:** FalkorDB is **deprecated** — MOC's knowledge graph was cut over to
+**Postgres** (`moc-db`, graph projection owned by `moc-graph-consolidator`;
+`GRAPH_PROJECTION_BACKEND=postgres`, verified via `/health` → `"graphBackend":"postgres"`).
+The old `moc-falkordb-1` container (6380) and the Mac Mini FalkorDB (`100.111.147.100:6379`)
+are no longer in MOC's runtime path. Cutover tooling: `services/graph-consolidator/scripts/falkor_postgres_cutover.py`.
+
+**Workers / internal-only (no host ports):** dh-scheduler, dh-worker-{registrar,a2,rdap,wayback,classifier,scoring}, vulture (DH Discord bot), moc-worker, n8n-runners, n8n-db (internal 5432), quip-db (internal 5432), quip-brain (internal 8080), quip-discord-bot (internal 8787), quip-whatsapp, quip-action-executor (internal 8788), quip-docker-proxy (internal 2375, read-only socket proxy).
 
 ### Available Port Ranges for New Projects
 
@@ -75,11 +86,12 @@ ssh pronav@100.103.66.92
 | 4000-4999 | APIs |
 | 5174-5435 | Frontends |
 | 5437-5499 | Databases |
-| 6000-6379 | Misc services |
+| 6000-6379 | Misc services (6006 taken: Phoenix) |
 | 6382-6999 | Misc services |
 | 7000-7999 | Misc services |
 | 8012-8087 | Python/ML services |
-| 8089-8999 | Python/ML services |
+| 8091-8789 | Python/ML services (8090 taken: quip-n8n-gate) |
+| 8791-8999 | Python/ML services (8790 taken: quip-agents) |
 
 ---
 
@@ -91,6 +103,8 @@ ssh pronav@100.103.66.92
 **Server path:** ~/docker/landing/
 **Container:** `prsnl-landing` (nginx:alpine, port 8088 → tunnel)
 Static marketing/landing page. No DB, no backend.
+Also serves **https://prsnl.fyi/deck** (MOC "how we use AI" company deck, added 2026-06-05) —
+drop `NAME.html` into `~/docker/landing/dist/` and nginx `try_files $uri.html` serves it at `/NAME`.
 
 ---
 
@@ -106,11 +120,10 @@ Static marketing/landing page. No DB, no backend.
 |-----------|-------|------|--------|-------|
 | moc-web | nginx:alpine | 5173 | Running | React SPA + reverse proxy |
 | moc-server | moc-server (custom) | 3000 | Running (healthy) | Hono backend |
-| moc-db | pgvector/pgvector:pg16 | 5433 | Running (healthy) | PostgreSQL + pgvector |
-| moc-falkordb-1 | falkordb/falkordb | 6380 | Running (healthy) | Knowledge graph store |
+| moc-db | pgvector/pgvector:pg16 | 5433 | Running (healthy) | PostgreSQL + pgvector — also the **graph store** (FalkorDB deprecated) |
 | moc-embedding | moc-embedding (custom) | 8004 | Running (healthy) | Embedding service (~3.5GB) |
 | moc-worker | moc-worker (custom) | (internal) | Running | Background work |
-| moc-graph-consolidator | moc-graph-consolidator | 8006 | Running (healthy) | Graph maintenance |
+| moc-graph-consolidator | moc-graph-consolidator | 8006 | Running (healthy) | Owns Postgres graph projection writes (`graphBackend: postgres`) |
 
 **Cloudflare Tunnel:**
 - Tunnel ID: `7959ea52-7f58-4657-b933-f785af2c87ad`
@@ -135,7 +148,7 @@ Browser → https://moc.prsnl.fyi
 - Restic backup freshness is checked by weekly maintenance via `moc-backup.service`
 
 **AI Integration:**
-- Claude Code CLI v2.1.74 inside moc-server container
+- Claude Code CLI (v2.1.92 on host; container version may lag — check `docker exec moc-server claude --version`)
 - Auth: `CLAUDE_CODE_OAUTH_TOKEN` env var (valid 1 year, expires ~April 2027)
 - Token set in docker-compose.prod.yml server service environment
 
@@ -165,7 +178,9 @@ sudo docker restart moc-web
 
 ### 2. Domain Hunter (XD)
 
-**Public URL:** https://xd.prsnl.fyi (intended; primarily used via Tailscale + Discord digest)
+**Public URL:** none — `xd.prsnl.fyi` is parked (`http_status:404` in the tunnel; the `dh-web`
+dashboard container was removed). Operated via **Vulture** (Discord bot, `vulture` container) +
+the daily Discord digest + Tailscale/`dh-api`.
 **Deployed:** 2026-05-14
 **Repo:** github.com/PranavSlathia/XD
 **Server path:** ~/docker/domain-hunter/
@@ -177,37 +192,33 @@ Self-hosted expired-domain discovery + scoring pipeline. Ingest GitHub README ci
 | Container | Image | Port | Status |
 |-----------|-------|------|--------|
 | dh-api | domain-hunter-dh-api | 8007 | FastAPI HTTP API |
-| dh-web | domain-hunter-dh-web | 8005 | Operator dashboard |
 | dh-scheduler | domain-hunter-dh-scheduler | — | APScheduler cron jobs (digest) |
 | dh-worker-a2 | domain-hunter-dh-worker-a2 | — | GitHub README ingest |
 | dh-worker-rdap | domain-hunter-dh-worker-rdap | — | DNS + OPR + RDAP enrich |
 | dh-worker-wayback | domain-hunter-dh-worker-wayback | — | Wayback CDX |
 | dh-worker-classifier | domain-hunter-dh-worker-classifier | — | Codex CLI safety classifier |
 | dh-worker-scoring | domain-hunter-dh-worker-scoring | — | Composite scoring v3 |
+| dh-worker-registrar | domain-hunter-dh-worker-registrar | — | Registrar checks |
+| vulture | (custom) | — | Discord operator bot (`Vulture#1112`, slash commands) |
 | dh-pg | pgvector/pgvector:pg16 | 5436 | Postgres + pgvector |
 | dh-redis | redis:7-alpine | 6381 | Worker queue + pub/sub |
 
+(`dh-web` operator dashboard: **removed**.)
+
 **Env file:** `~/docker/domain-hunter/.env` (chmod 600) — see repo README for the required keys (DH_GITHUB_TOKEN, DH_OPENPAGERANK_API_KEY, DH_WHOISJSON_API_KEY, DH_DISCORD_WEBHOOK_URL, DH_SENTRY_DSN, etc.).
 
-**External integrations wired:** Open PageRank (DomCop), WhoisJSON, Discord webhook, GlitchTip (Sentry-compatible) via `DH_SENTRY_DSN`.
+**External integrations wired:** Open PageRank (DomCop), WhoisJSON, Discord webhook.
+⚠️ GlitchTip was **retired** (see §3) — if `DH_SENTRY_DSN` is still set in `.env`, DH error
+events go nowhere; unset it or point at a live sink.
 
 ---
 
-### 3. GlitchTip (self-hosted error tracking)
+### 3. GlitchTip (self-hosted error tracking) — ⚪ RETIRED
 
-**Access:** Tailscale-only at http://100.103.66.92:8011 (no Cloudflare route)
-**Deployed:** 2026-05-17
-**Server path:** ~/docker/domain-hunter/glitchtip-compose.yml (cohabits dh project dir)
-**Env file:** ~/docker/domain-hunter/.glitchtip.env
-
-| Container | Image | Port | Status |
-|-----------|-------|------|--------|
-| gt-web | glitchtip/glitchtip@sha256:f45485d296697531464b4484ee9bb40a51a774df820f74128a2b2ae0c5a0b00f | 8011 | Web UI + API |
-| gt-worker | glitchtip/glitchtip@sha256:f45485d296697531464b4484ee9bb40a51a774df820f74128a2b2ae0c5a0b00f | — | Celery worker |
-| gt-pg | postgres:16 | (internal 5432) | Event/issue store |
-| gt-redis | redis:7-alpine | (internal 6379) | Celery broker |
-
-Sentry-compatible — any service using the Sentry SDK can ship events here by setting its DSN. Used by Domain Hunter (`DH_SENTRY_DSN`).
+**Status (2026-06-11 audit):** all four containers (gt-web, gt-worker, gt-pg, gt-redis) are
+**gone** — neither running nor stopped. Port 8011 is free again. Compose/env files may remain at
+`~/docker/domain-hunter/glitchtip-compose.yml` / `.glitchtip.env` for a future revival.
+Anything still pointing a Sentry DSN at it (e.g. `DH_SENTRY_DSN`) is shipping events to nowhere.
 
 ---
 
@@ -234,8 +245,35 @@ Config notes:
 - Security policy is managed by env: personal-space sharing/publishing are disabled; MFA enforcement is explicitly off until the owner account has MFA configured.
 - n8n is dual-bound to `100.103.66.92:5678` and `127.0.0.1:5678`; it is still not LAN/public exposed.
 - Not using queue mode / Redis / worker processors yet; that is intentionally deferred until real workflow volume justifies the extra always-on services.
-- ntfy is a future infra-alert rail only; do not make it part of Quip v1.
-- Quip is now Discord-first. Prefer a `quip-discord-bot` sidecar that connects outbound to Discord and calls n8n internally; do not expose a public n8n webhook for Quip v1.
+- ntfy is a future infra-alert rail only.
+- Quip (Discord ops assistant) shipped and lives in the same compose project — see §5.
+
+---
+
+### 5. Quip (Discord-first ops assistant)
+
+**Frontend:** Discord (bot `Quip#7007` + specialist agents). No public web UI.
+**Deployed:** 2026-06-02 onward
+**Repo:** github.com/PranavSlathia/quip
+**Server path:** ~/docker/n8n/ (same compose project as n8n; build context `~/docker/n8n/quip`,
+rsync-synced from the repo — **not** a git checkout; see repo STATUS.md for the deploy flow)
+
+| Component | Where | Port | Purpose |
+|-----------|-------|------|---------|
+| quip-discord-bot | container | internal 8787 (`/send`) | Discord frontend: @mention/DM/slash (`/quip`, `/cleanup`), confirm buttons, embeds |
+| quip-brain | container | internal 8080 | Hono + Vercel AI SDK agent (Fireworks DeepSeek): tools, memory, guarded actions |
+| quip-db | container | internal 5432 | Postgres: conversation memory, notes, reminders, `pending_actions` audit |
+| quip-whatsapp | container | internal | Baileys WhatsApp sidecar (own number) |
+| quip-action-executor | container | internal 8788 | Sole writer of whitelisted docker actions (restart/start/stop/cleanup) after user confirm |
+| quip-docker-proxy | container | internal 2375 | Read-only docker socket proxy (CONTAINERS/INFO/PING/SYSTEM GET; `POST: 0`) |
+| quip-n8n-gate | container | 127.0.0.1:8090 | Caddy basic-auth gate fronting n8n for n8n.prsnl.fyi |
+| quip-agents | **host systemd service** (`/home/agent/quip-agents`, non-root `agent` user) | 0.0.0.0:8790 (UFW: n8n-net only, bearer-gated) | Specialist CLI agents (Madame Web/gemini, Scrivener/codex, Gwen/qwen) as Discord bots + brain→agent `/run` consult bridge |
+| phoenix | container (`~/docker/phoenix/`) | 100.103.66.92:6006 | Arize Phoenix LLM-trace UI; brain exports OTLP via docker network (`http://phoenix:6006/v1/traces`) |
+
+Security model: brain/bot never touch the docker socket directly — reads via the read-only proxy,
+writes only through the executor after an explicit Discord confirm (audited in `pending_actions`).
+MOC containers are protected/refused targets. Nightly quip-db restic backup (timer already listed
+in Key Config Files).
 
 ---
 
@@ -281,31 +319,33 @@ Config notes:
 ### Firewall (UFW) — Current Rules
 
 ```
-Public access:
-  22/tcp    → SSH (key-only, fail2ban)
-  80/tcp    → HTTP (Cloudflare-only in practice)
-  443/tcp   → HTTPS (Cloudflare-only in practice)
+UFW allow rules (verified 2026-06-11):
+  22/tcp    → SSH, from anywhere (key-only, fail2ban). NOTE: fail2ban shows 0 bans
+              over 9 days of uptime — the router almost certainly does not forward
+              :22, so in practice SSH is LAN + Tailscale only.
+  3001, 9443, 9999, 19999 → from Tailscale (100.64.0.0/10) only
+  19999/tcp → also from n8n-net docker bridge (172.24.0.0/16) — Quip alert checker
+              reads host metrics from Netdata (read-only)
+  8790/tcp  → from 172.24.0.0/16 only — Quip brain→agents consult bridge (bearer-gated)
 
-  Note: project ports are NOT publicly exposed via UFW — public traffic
-  arrives via Cloudflare Tunnel (outbound-only), which connects to
-  localhost:<port> inside the host. Audit `sudo ufw status` before opening
-  any new public port.
+(Stale Langfuse :3030 rules removed 2026-06-11. Langfuse itself retired 2026-06-03 → Phoenix.)
 
-Tailscale only (100.64.0.0/10 and/or services bound to `100.103.66.92`):
-  3001  → Uptime Kuma
-  5001  → Dockge
-  5678  → n8n (also bound to 127.0.0.1 for local tunnel origin)
-  8081  → pgweb
-  9443  → Portainer
-  9999  → Dozzle
-  8011  → GlitchTip
-  19999 → Netdata (also allowed from the n8n-net docker bridge `172.24.0.0/16` so the
-          Quip alert checker can read host disk/CPU metrics — Netdata is read-only)
+Public traffic does NOT enter via UFW at all — it arrives via Cloudflare Tunnel
+(outbound-only connection), which proxies to localhost:<port>. 80/443 are not
+forwarded by the router.
+
+Dockge (5001), pgweb (8081), Portainer edge (8000), n8n (5678), Phoenix (6006) are
+restricted by their Docker port binding to `100.103.66.92:` (Tailscale interface)
+rather than by UFW rules.
+
+⚠️ Remember: Docker-published ports on 0.0.0.0 bypass UFW (DOCKER iptables chain).
+Restrict containers by binding (`100.103.66.92:` / `127.0.0.1:`), not by UFW alone.
 
 Internal or localhost-only:
-  dh-pg (5436), dh-redis (6381), dh-api (8007), gt-pg, gt-redis,
+  dh-pg (5436), dh-redis (6381), dh-api (8007),
   moc-db, moc-server (3000), moc-embedding (8004), moc-graph-consolidator (8006),
-  n8n-runners (5679), n8n-db
+  n8n-runners (5679), n8n-db, quip-db, quip-brain, quip-action-executor,
+  quip-docker-proxy, quip-n8n-gate (127.0.0.1:8090), prsnl-landing (127.0.0.1:8088)
 ```
 
 ## Security
@@ -369,6 +409,11 @@ net.ipv4.tcp_tw_reuse=1                   # Reuse TIME_WAIT sockets
 | autoheal | willfarrell/autoheal | Restart unhealthy containers | always |
 
 Infrastructure compose: `~/docker/docker-compose.yml` (pgweb + dockge live in their own dirs).
+
+Note: `uptime-kuma` and `dozzle` currently run under hash-prefixed container names
+(`58892943e1b5_uptime-kuma`, `a61f323b94f8_dozzle`) — leftover from an interrupted compose
+recreate. Harmless, but `docker ps` greps and `docker restart uptime-kuma` by plain name will
+miss them; a future `docker compose up -d --force-recreate` of the infra stack will fix the names.
 
 ## Developer Tools on Server
 
@@ -467,10 +512,10 @@ ssh pronav@192.168.1.18 "echo '=== UPTIME ===' && uptime && echo '=== MEMORY ===
 
 ## Resource Budget
 
-| Resource | Total | Used | Available | Notes (as of 2026-05-26) |
+| Resource | Total | Used | Available | Notes (as of 2026-06-11) |
 |----------|-------|------|-----------|--------------------------|
-| RAM | 7.7 GB | ~4-5 GB typical | ~3 GB typical | Keep new services lean; embedding is the largest workload |
-| Disk | 218 GB | ~41 GB | ~167 GB | Docker images ~14GB · volumes ~8GB · build cache ~9GB |
+| RAM | 7.7 GB | ~3.7-4.5 GB typical | ~3-4 GB typical | Keep new services lean; embedding is the largest workload (~800MB of its cold pages live in swap by design) |
+| Disk | 218 GB | ~62 GB | ~146 GB | Docker images ~18GB · volumes ~8GB · **build cache regrows ~10-20GB/week** (GH Actions runner + quip rebuilds) — `docker builder prune -f` periodically, or use Quip's `/cleanup` |
 | CPU | 2 cores | workload-dependent | Constrained | Celeron is the real bottleneck; avoid piling on crawlers/ML without offloading |
 
 When adding projects, budget ~500MB-2GB RAM per project depending on stack and treat sustained 15-minute load over ~3.0 as a warning. The weekly maintenance script now flags CPU load pressure.
@@ -481,10 +526,8 @@ Single tunnel (`moc`), config at `/etc/cloudflared/config.yml`:
 
 | Hostname | → Local | Container |
 |----------|---------|-----------|
-| prsnl.fyi | localhost:8088 | prsnl-landing |
+| prsnl.fyi | localhost:8088 | prsnl-landing (incl. `/deck`) |
 | www.prsnl.fyi | localhost:8088 | prsnl-landing |
 | moc.prsnl.fyi | localhost:5173 | moc-web |
-| xd.prsnl.fyi | localhost:8005 | dh-web |
+| xd.prsnl.fyi | http_status:404 | parked (dh-web removed) |
 | n8n.prsnl.fyi | localhost:8090 | quip-n8n-gate (Caddy Basic-Auth) → n8n |
-
-GlitchTip is intentionally Tailscale-only (no tunnel route).
