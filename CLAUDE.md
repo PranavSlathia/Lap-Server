@@ -18,8 +18,11 @@ ssh pronav@100.103.66.92
 
 `breakglass` is a local sudo fallback user (uid 1002, `sudo` group; sudo is **password-required**
 per `scripts/access-hardening.sh` — no NOPASSWD) carrying the same Mac Mini SSH public key. Use it
-only for access recovery; its password is stored outside the server/repo and should live in a
-password manager. **Provisioned & SSH-verified 2026-06-17** (`ssh breakglass@100.103.66.92`) — prior
+only for access recovery; its password lives in a **password manager** (the durable copy) and is
+also recorded in the on-server recovery note (`PRSNL_RECOVERY.md`) for convenience — never in this
+repo. Note: `access-hardening.sh` rewrites the recovery note *without* the password, so the
+password-manager copy is the one that survives a re-run. **Provisioned & SSH-verified 2026-06-17**
+(`ssh breakglass@100.103.66.92`) — prior
 to that the account was documented but did not actually exist on the box. Tailscale SSH is intentionally disabled
 (`tailscale debug prefs` → `"RunSSH": false`) because it can add browser approval to
 `ssh pronav@100.103.66.92` and interrupt deploy agents; normal OpenSSH over the Tailscale IP is what
@@ -381,7 +384,9 @@ Internal or localhost-only:
 - **Breakglass admin**: user `breakglass`, `sudo` group, **password-required** sudo (no NOPASSWD
   drop-in — matches `scripts/access-hardening.sh`), same Mac Mini key authorized. Provisioned &
   SSH login-verified 2026-06-17; re-provision/refresh via `bash scripts/access-hardening.sh`.
-  Password storage is off-box only; do not put it in this repo or the server recovery note.
+  Password is kept in a password manager (durable) **and** recorded in the server recovery note
+  (`PRSNL_RECOVERY.md`) for convenience — never in this repo. `access-hardening.sh` regenerates the
+  note without the password, so re-running it requires re-adding the note copy if you want both.
 - `/etc/sudoers.d/pronav` permissions corrected to `root:root 0440` on 2026-06-17 (was flagged by
   `visudo -c` as "bad permissions" — sudo can ignore a wrongly-permissioned drop-in).
 
