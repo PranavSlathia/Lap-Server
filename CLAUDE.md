@@ -16,9 +16,21 @@ ssh pronav@100.103.66.92
 # User: pronav | Passwordless sudo | SSH key auth from Mac Mini
 ```
 
-`breakglass` is a local sudo fallback user with copied SSH public keys. Use it only for access
-recovery and keep its password outside this repo. Tailscale SSH is intentionally disabled because
-it can add browser approval to `ssh pronav@100.103.66.92` and interrupt deploy agents.
+`breakglass` is a local sudo fallback user (uid 1002, `sudo` group; sudo is **password-required**
+per `scripts/access-hardening.sh` — no NOPASSWD) carrying the same Mac Mini SSH public key. Use it
+only for access recovery; its password is stored outside the server/repo and should live in a
+password manager. **Provisioned & SSH-verified 2026-06-17** (`ssh breakglass@100.103.66.92`) — prior
+to that the account was documented but did not actually exist on the box. Tailscale SSH is intentionally disabled
+(`tailscale debug prefs` → `"RunSSH": false`) because it can add browser approval to
+`ssh pronav@100.103.66.92` and interrupt deploy agents; normal OpenSSH over the Tailscale IP is what
+deploy agents use.
+
+> ⚠️ **Single-key fragility (as of 2026-06-17):** only **one** key is in `pronav`'s (and
+> `breakglass`'s) `authorized_keys` — the Mac Mini ed25519 (`pronav@Pranavs-Mac-mini.local`). Both
+> remote paths therefore depend on the **Mac Mini being available**. If it is off/unreachable, the
+> only way in is the physical console + password (the trap that caused the 2026-06-17 lockout).
+> Fix: add the MacBook Air and iPhone public keys to `~/.ssh/authorized_keys` so more than one
+> device can reach the box.
 
 Live recovery note on the server: `/home/pronav/server-recovery/PRSNL_RECOVERY.md`.
 
@@ -356,11 +368,22 @@ Internal or localhost-only:
 
 ## Security
 
-### SSH (hardened 2026-04-06)
-- **Password authentication: DISABLED** (key-only)
+### SSH (hardened 2026-04-06; re-verified 2026-06-17)
+- **Password authentication: DISABLED** (key-only) — enforced in `sshd_config`,
+  `sshd_config.d/00-disable-password-auth.conf`, and `sshd_config.d/50-cloud-init.conf`.
+  The `pronav` console password (reset to a simple value during the 2026-06-17 lockout) is
+  therefore **only** usable at the physical console + Cockpit (`:9090`), never over SSH.
 - **Root login: DISABLED**
-- Key-based auth from Mac Mini (ed25519)
+- Key-based auth from Mac Mini (ed25519). ⚠️ **Only this one key is authorized** for both
+  `pronav` and `breakglass` → SSH access depends on the Mac Mini being up. Add MacBook Air +
+  iPhone keys to remove this single point of failure.
 - Passwordless sudo via `/etc/sudoers.d/pronav`
+- **Breakglass admin**: user `breakglass`, `sudo` group, **password-required** sudo (no NOPASSWD
+  drop-in — matches `scripts/access-hardening.sh`), same Mac Mini key authorized. Provisioned &
+  SSH login-verified 2026-06-17; re-provision/refresh via `bash scripts/access-hardening.sh`.
+  Password storage is off-box only; do not put it in this repo or the server recovery note.
+- `/etc/sudoers.d/pronav` permissions corrected to `root:root 0440` on 2026-06-17 (was flagged by
+  `visudo -c` as "bad permissions" — sudo can ignore a wrongly-permissioned drop-in).
 
 ### Fail2ban
 - Protects SSH from brute-force attacks

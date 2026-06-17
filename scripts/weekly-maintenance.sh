@@ -70,7 +70,7 @@ else                               heal "Inodes at ${INODE_USE}%"
 fi
 
 # ── Check 2: Container health & restart counts ────────────────
-UNHEALTHY=$(docker ps -a --format '{{.Names}}|{{.Status}}' | awk -F'|' '$2 !~ /^Up.*\(healthy\)/ && $2 !~ /^Up [0-9]+ (seconds|minutes|hours|days|weeks)$/ {print $1": "$2}')
+UNHEALTHY=$(docker ps -a --format '{{.Names}}|{{.Status}}' | awk -F'|' '$2 !~ /^Up / || $2 ~ /\(unhealthy\)/ {print $1": "$2}')
 if [[ -n "$UNHEALTHY" ]]; then
   while IFS= read -r line; do warn "Container not healthy — $line"; done <<<"$UNHEALTHY"
 else
@@ -140,7 +140,7 @@ fi
 # ── Check 8: UFW posture ───────────────────────────────────────
 UFW_STATE=$(ufw status | head -1)
 if [[ "$UFW_STATE" == *"Status: active"* ]]; then
-  PUBLIC_PORTS=$(ufw status | awk '/ALLOW/ && !/100\.64\.0\.0|192\.168\.1\.0|127\.0\.0\.1/ && !/(v6)/ {print}' | grep -v '^$')
+  PUBLIC_PORTS=$(ufw status | awk '/ALLOW/ && !/100\.64\.0\.0|192\.168\.1\.0|172\.24\.0\.0|127\.0\.0\.1/ && !/(v6)/ {print}' | grep -v '^$')
   # Expected public-allow rules: 22 (ssh) only. Cloudflare Tunnel uses outbound.
   UNEXPECTED_PUBLIC=$(echo "$PUBLIC_PORTS" | awk '{print $1}' | grep -vE '^(22|22/tcp|OpenSSH|Anywhere)$' | grep -v '^$' || true)
   heal "UFW active"

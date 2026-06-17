@@ -58,6 +58,20 @@ do not print it into logs. The live recovery note is:
 /home/pronav/server-recovery/PRSNL_RECOVERY.md
 ```
 
+> **Status 2026-06-17:** `breakglass` is now actually provisioned and login-verified
+> (`ssh breakglass@100.103.66.92` + `sudo` both confirmed). Before this date it was documented
+> here but the account did **not** exist on the box — treat that as a reminder to re-verify
+> recovery paths, not just document them.
+>
+> ⚠️ **Single-key fragility:** `pronav` and `breakglass` both authorize only **one** key — the
+> Mac Mini ed25519. Every remote path dies if the Mac Mini is unavailable, leaving only the
+> physical console + password (exactly the 2026-06-17 lockout scenario). Add the MacBook Air and
+> iPhone public keys to `~/.ssh/authorized_keys` to get a second/third independent way in.
+>
+> Note: the on-server `PRSNL_RECOVERY.md` was regenerated 2026-06-17 via `access-hardening.sh`
+> (its old hand-written copy wrongly claimed "Tailscale SSH is enabled"; live pref is
+> `"RunSSH": false`). The breakglass password is recorded in that note, not here.
+
 Tailscale SSH is intentionally disabled on `prsnl`; keep normal OpenSSH working over the
 Tailscale IP because deploy agents use `ssh pronav@100.103.66.92` non-interactively.
 
@@ -113,7 +127,7 @@ sudo fail2ban-client status sshd
 Check public URLs first:
 
 ```bash
-for u in https://prsnl.fyi https://www.prsnl.fyi https://moc.prsnl.fyi https://xd.prsnl.fyi; do
+for u in https://prsnl.fyi https://www.prsnl.fyi https://moc.prsnl.fyi https://n8n.prsnl.fyi; do
   curl -sk -o /dev/null -w "$u %{http_code}\n" "$u"
 done
 ```
@@ -123,7 +137,7 @@ Then check the local origins on the server:
 ```bash
 curl -fsS http://127.0.0.1:8088/ >/dev/null && echo landing-ok
 curl -fsS http://127.0.0.1:5173/ >/dev/null && echo moc-web-ok
-curl -fsS http://127.0.0.1:8005/ >/dev/null && echo dh-web-ok
+curl -fsS http://127.0.0.1:8090/ >/dev/null && echo n8n-gate-ok
 sudo systemctl status cloudflared --no-pager
 sudo journalctl -u cloudflared --since "30 min ago" --no-pager
 ```
@@ -150,7 +164,8 @@ Use the owning compose directory. Do not recreate unrelated stacks.
 | MOC prod stack | `~/docker/moc/docker-compose.prod.yml` |
 | MOC fallback/graph stack | `~/docker/moc/docker-compose.yml` |
 | Domain Hunter | `~/docker/domain-hunter/compose.yml` |
-| GlitchTip | `~/docker/domain-hunter/glitchtip-compose.yml` |
+| n8n / Quip | `~/docker/n8n/docker-compose.yml` |
+| Phoenix | `~/docker/phoenix/docker-compose.yml` |
 | Landing page | `~/docker/landing/` |
 
 Typical flow:
@@ -187,7 +202,7 @@ Expected Docker-published local addresses:
 Probe from the Mac when validating LAN exposure:
 
 ```bash
-for p in 3001 5001 5678 8000 8004 8006 8007 8011 8081 9443 9999 19999; do
+for p in 3001 5001 5678 6006 8000 8004 8006 8007 8081 9443 9999 19999; do
   nc -vz -G 2 192.168.1.18 "$p"
 done
 ```

@@ -25,12 +25,13 @@ A Dell Vostro laptop running Ubuntu Server 24.04 LTS, repurposed as a developmen
 | 5173 | MOC frontend | Public via Cloudflare Tunnel |
 | 5433 | MOC PostgreSQL | Internal only |
 | 5678 | n8n (workflow automation) | Tailscale + localhost |
-| 6380 | MOC FalkorDB fallback | Tailscale only |
+| 6006 | Phoenix LLM traces | Tailscale only |
 | 8004 | MOC embedding | Localhost only |
-| 8005 | Domain Hunter web | Public via Cloudflare Tunnel |
 | 8006 | MOC graph consolidator | Localhost only |
 | 8007 | Domain Hunter API | Localhost only |
 | 8081 | pgweb | Tailscale only |
+| 8090 | n8n public basic-auth gate | Localhost tunnel origin |
+| 8790 | Quip agents bridge | n8n-net only via UFW |
 | 9443 | Portainer | Tailscale only |
 | 9999 | Dozzle | Tailscale only |
 | 19999 | Netdata | Tailscale only |
@@ -78,7 +79,7 @@ Everything runs in Docker. The main compose file is at `~/docker/docker-compose.
 1. **Add it to the docker-compose.yml** on the server (or create a separate compose file in `~/docker/`)
 2. **Run:** `cd ~/docker && sudo docker compose up -d`
 3. **Bind host ports explicitly** to `127.0.0.1` for tunnel-only services or `100.103.66.92` for Tailscale-only services
-4. All containers MUST use `restart: always` so they survive reboots
+4. Containers must have an explicit restart policy (`always` for core infra; `unless-stopped` for intentionally operator-managed app sidecars)
 
 ### To deploy a custom app (e.g., FastAPI backend):
 
@@ -139,7 +140,7 @@ Do NOT remove or modify these containers. They are infrastructure.
 
 ### Reliability
 - This is a home server, NOT a datacenter. Power cuts and WiFi drops can happen.
-- All containers must use `restart: always`.
+- All containers must have an explicit restart policy. Use `restart: always` for core infra and `restart: unless-stopped` only when manual stop semantics matter.
 - Store important data in Docker volumes (they survive container recreation).
 - Add a systemd backup timer for every database; MOC uses `moc-backup.timer` + restic.
 - The server auto-reboots at 4:00 AM if a kernel update requires it.

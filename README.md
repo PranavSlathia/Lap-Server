@@ -42,7 +42,7 @@ This particular Dell Vostro has an Intel Celeron 2957U (1.4GHz, 2 cores), 8GB RA
    │  │  cloudflared (systemd) — public ingress                          │  │
    │  │    prsnl.fyi, www.prsnl.fyi → :8088  (prsnl-landing nginx)       │  │
    │  │    moc.prsnl.fyi           → :5173  (MOC web)                    │  │
-   │  │    xd.prsnl.fyi            → :8005  (Domain Hunter web)          │  │
+   │  │    xd.prsnl.fyi            → parked 404 (DH web removed)         │  │
    │  └─────────────────────────┬────────────────────────────────────────┘  │
    │                            │                                           │
    │  ┌─────────────────────────▼────────────────────────────────────────┐  │
@@ -51,21 +51,20 @@ This particular Dell Vostro has an Intel Celeron 2957U (1.4GHz, 2 cores), 8GB RA
    │  │  Project: MindOverChatter (~/docker/moc/)                        │  │
    │  │    moc-web → moc-server → moc-db (pgvector)                      │  │
    │  │            ↘ moc-embedding · moc-worker · moc-graph-consolidator │  │
-   │  │            ↘ moc-falkordb                                        │  │
+   │  │              graph projection lives in Postgres; FalkorDB retired│  │
    │  │                                                                  │  │
    │  │  Project: Domain Hunter (~/docker/domain-hunter/)                │  │
-   │  │    dh-api · dh-web · dh-scheduler                                │  │
+   │  │    dh-api · vulture Discord bot · dh-scheduler                   │  │
    │  │    dh-worker-{a2,rdap,wayback,classifier,scoring}                │  │
    │  │    dh-pg (pgvector) · dh-redis                                   │  │
    │  │                                                                  │  │
-   │  │  Project: GlitchTip (~/docker/domain-hunter/glitchtip-compose)   │  │
-   │  │    gt-web · gt-worker · gt-pg · gt-redis (error tracking, all)   │  │
+   │  │  Project: GlitchTip — retired; old compose may remain for revival│  │
    │  │                                                                  │  │
    │  │  Project: prsnl-landing (~/docker/landing/)                      │  │
    │  │    prsnl-landing (nginx) — public marketing page                 │  │
    │  │                                                                  │  │
    │  │  Project: n8n (~/docker/n8n/) — workflow automation              │  │
-   │  │    n8n + external runners + Postgres, pinned 2.22.6, TS :5678    │  │
+   │  │    n8n + runners + Postgres + Quip brain/Discord/WhatsApp sidecars│ │
    │  │                                                                  │  │
    │  │  Infra (shared, in ~/docker/docker-compose.yml):                 │  │
    │  │    Portainer · Dockge · Uptime Kuma · Dozzle · Netdata           │  │
@@ -216,10 +215,10 @@ Lap-Server/
 | Project | URL | Stack |
 |---------|-----|-------|
 | prsnl-landing | https://prsnl.fyi | nginx static landing page |
-| MindOverChatter | https://moc.prsnl.fyi | React + Hono + PostgreSQL+pgvector + embedding + graph consolidator + FalkorDB |
-| Domain Hunter | https://xd.prsnl.fyi (Tailscale-only in practice) | FastAPI + SQLAlchemy + Postgres+pgvector + Redis + 5 workers |
-| GlitchTip | Tailscale: http://100.103.66.92:8011 | Self-hosted Sentry-compatible error tracking |
-| n8n | Tailscale: http://100.103.66.92:5678 | Workflow automation (n8n 2.22.6 + external runners + native Python runner + Postgres + metrics) |
+| MindOverChatter | https://moc.prsnl.fyi | React + Hono + PostgreSQL+pgvector + embedding + Postgres graph projection |
+| Domain Hunter | Discord/Vulture + localhost API | FastAPI + SQLAlchemy + Postgres+pgvector + Redis + workers |
+| n8n / Quip | Tailscale: http://100.103.66.92:5678; gated public n8n via `n8n.prsnl.fyi` | Workflow automation + Quip brain/Discord/WhatsApp sidecars |
+| Phoenix | Tailscale: http://100.103.66.92:6006 | LLM trace observability |
 
 Detailed n8n notes live in `docs/N8N-ARCHITECTURE.md`; candidate add-ons and external templates are tracked in `docs/N8N-INTEGRATION-SHORTLIST.md`.
 

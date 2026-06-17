@@ -1,8 +1,10 @@
 # n8n — self-hosted workflow automation.
 # Access: Tailscale-only editor UI (http://100.103.66.92:5678). NOT public.
 # The 127.0.0.1 bind is for host-local health checks and future tunnel origin use.
-#   Quip is Discord-first: run a small bot sidecar that connects outbound to
-#   Discord and calls n8n internally. Do not expose a public n8n webhook for v1.
+#   (When a public webhook is needed later — e.g. the WhatsApp assistant — add a
+#    Cloudflare Tunnel route n8n.prsnl.fyi -> localhost:5678, set WEBHOOK_URL
+#    to the https URL, set N8N_PROXY_HOPS=1, and protect non-webhook paths with
+#    Cloudflare Access/WAF rules. A raw public tunnel exposes the editor too.)
 # Secrets live in .env (chmod 600):
 #   N8N_ENCRYPTION_KEY  <- NEVER lose/rotate this; it encrypts all stored credentials
 #   N8N_DB_PASSWORD
@@ -53,7 +55,7 @@ services:
       - N8N_EDITOR_BASE_URL=http://100.103.66.92:5678/
       - WEBHOOK_URL=http://100.103.66.92:5678/
       - N8N_SECURE_COOKIE=false      # required for http access over a private IP
-      - N8N_PROXY_HOPS=1             # trust 1 reverse-proxy hop (quip-n8n-gate Caddy); silences X-Forwarded-For warning
+      - N8N_PROXY_HOPS=1             # trust 1 reverse-proxy hop (the quip-n8n-gate Caddy); silences X-Forwarded-For warning
       - GENERIC_TIMEZONE=Asia/Kolkata
       - TZ=Asia/Kolkata
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
@@ -139,6 +141,7 @@ services:
       CONTAINERS: 1
       INFO: 1
       PING: 1
+      SYSTEM: 1        # GET /system/df only (reclaimable-space preview for /cleanup); POST:0 keeps it read-only
       POST: 0          # no write verbs (no restart yet — that's Slice 3)
       EXEC: 0
       IMAGES: 0
@@ -168,9 +171,6 @@ services:
         limits:
           memory: 160M
 
-  # Basic-Auth gate in front of n8n for public access via n8n.prsnl.fyi.
-  # (Cloudflare Access needs a card; this is the card-free perimeter.)
-  # Caddyfile holds the bcrypt hash and is NOT committed (like the .env files).
   quip-n8n-gate:
     image: caddy:2-alpine
     container_name: quip-n8n-gate
@@ -185,7 +185,6 @@ services:
         limits:
           memory: 64M
 
-  # Quip Slice 2 data layer: reminders, processed_events, messages. Internal-only.
   quip-db:
     image: postgres:16-alpine
     container_name: quip-db
@@ -221,6 +220,39 @@ services:
         limits:
           memory: 96M
 
+  # AI-SDK brain — the production conversational path (replaced the n8n agent node).
+  quip-brain:
+    build:
+      context: ./quip
+      dockerfile: quip-brain/Dockerfile
+    container_name: quip-brain
+    restart: unless-stopped
+    env_file: quip-brain.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks: [n8n-net]
+    deploy:
+      resources:
+        limits:
+          memory: 320M
+
+  # WhatsApp channel adapter (Baileys, owner's own number). Session persists in the
+  # external quip-wa-auth volume so recreation does not require re-pairing.
+  quip-whatsapp:
+    build:
+      context: ./quip
+      dockerfile: quip-whatsapp/Dockerfile
+    container_name: quip-whatsapp
+    restart: unless-stopped
+    env_file: quip-whatsapp.env
+    volumes:
+      - quip-wa-auth:/data/wa-auth
+    networks: [n8n-net]
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
 networks:
   n8n-net:
     name: n8n-net
@@ -229,3 +261,6 @@ volumes:
   n8n-data:
   n8n-db-data:
   quip-db-data:
+  quip-wa-auth:
+    external: true
+    name: quip-wa-auth
