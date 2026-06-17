@@ -106,6 +106,18 @@ ssh pronav@100.103.66.92
 
 **Tailscale** is what makes this possible — it creates a private mesh network across your devices (Mac Mini, MacBook Air, iPhone, the server). Each device gets a stable `100.x.x.x` IP that works regardless of which WiFi you're on. No VPN passwords, no port forwards, no dynamic DNS.
 
+Keep normal OpenSSH as the default deploy path. Tailscale SSH is intentionally disabled on
+`prsnl` because it can introduce a browser approval step on `ssh pronav@100.103.66.92`, which
+breaks automated deploys and agent workflows that expect plain SSH.
+
+Break-glass access exists through the local `breakglass` sudo user. Its password is stored outside
+the server; use it only if `pronav` auth is broken. The live recovery note is
+`/home/pronav/server-recovery/PRSNL_RECOVERY.md`.
+
+Network priority is Ethernet-first, WiFi-fallback: `enp7s0` DHCP has route metric `100`, while
+static WiFi `wlp6s0` keeps `192.168.1.18` with default route metric `600`. Ethernet is marked
+optional so the host still boots cleanly when the cable is unplugged.
+
 Once on the Tailscale network, all dashboards become reachable:
 
 | Service | URL | Purpose |
@@ -193,6 +205,7 @@ Lap-Server/
 └── scripts/
     ├── health-check.sh           Run a full server health check via SSH
     ├── deploy-compose.sh         Deploy docker-compose to the server
+    ├── access-hardening.sh       Reapply SSH/breakglass/recovery-note hardening
     └── weekly-maintenance.sh     Comprehensive Sunday maintenance — runs as root cron, checks restic backup freshness, posts GitHub issue on warnings/critical
 ```
 

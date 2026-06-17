@@ -52,6 +52,10 @@ ssh pronav@100.103.66.92
 - User: `pronav`
 - Auth: SSH key (no password needed)
 - Sudo: passwordless (`sudo` just works, no password prompt)
+- Breakglass fallback: `breakglass` is a local sudo user with the same SSH public keys as `pronav`.
+  Use it only if `pronav` auth is broken. Do not commit or print its password.
+- Tailscale SSH is intentionally disabled. Leave normal OpenSSH on `100.103.66.92` alone because
+  deploy agents use it non-interactively.
 
 ## Networking
 
@@ -149,6 +153,9 @@ Do NOT remove or modify these containers. They are infrastructure.
 
 ### Networking
 - The server gets a static IP (192.168.1.18) on WiFi but has no public IP.
+- Ethernet `enp7s0` is configured as the preferred network when plugged in; WiFi `wlp6s0` is the
+  fallback. Netplan route metrics are Ethernet `100`, WiFi `600`, and Ethernet is optional so
+  boot does not hang without a cable.
 - To expose services to the internet: use **Cloudflare Tunnel** to a localhost-bound service, not port forwarding.
 - For dev/testing: access via SSH tunnel or Tailscale IP directly.
 - For incidents and recovery work, start with this repo's `SOS-RUNBOOK.md`.
@@ -159,6 +166,7 @@ Do NOT remove or modify these containers. They are infrastructure.
 |------|------|
 | `~/docker/` | Docker compose files |
 | `/etc/netplan/01-network.yaml` | Network config |
+| `/home/pronav/server-recovery/PRSNL_RECOVERY.md` | Live recovery note written by `scripts/access-hardening.sh` |
 | `/etc/docker/daemon.json` | Docker daemon config |
 | `/etc/fail2ban/jail.local` | Fail2ban config |
 | `/etc/sysctl.d/99-server.conf` | Kernel tuning |

@@ -42,12 +42,39 @@ sudo docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 
 ## Access Recovery
 
+Known-good access paths:
+
+```bash
+ssh pronav@100.103.66.92
+ssh pronav@192.168.1.18
+ssh breakglass@100.103.66.92
+ssh breakglass@192.168.1.18
+```
+
+`breakglass` is a local sudo admin for emergencies only. Keep its password outside this repo and
+do not print it into logs. The live recovery note is:
+
+```bash
+/home/pronav/server-recovery/PRSNL_RECOVERY.md
+```
+
+Tailscale SSH is intentionally disabled on `prsnl`; keep normal OpenSSH working over the
+Tailscale IP because deploy agents use `ssh pronav@100.103.66.92` non-interactively.
+
+Current network priority is Ethernet-first, WiFi-fallback:
+
+- `enp7s0`: DHCP, optional, route metric `100`
+- `wlp6s0`: static `192.168.1.18`, default route metric `600`
+
 If local SSH and Tailscale SSH both fail:
 
 1. Check power and the physical laptop.
 2. Check WiFi/router status.
-3. Use keyboard/monitor access if possible.
-4. After login, check:
+3. If Ethernet is available, plug it in and retry `ssh pronav@192.168.1.18` after the router assigns a lease.
+4. Use keyboard/monitor access if possible.
+5. If the machine shows Windows Boot Manager, PXE/Realtek network boot, or "required device is not connected", power down and reseat the internal SSD before changing software.
+6. Use a wired USB keyboard for BIOS/GRUB/recovery. Bluetooth keyboards are not reliable before Ubuntu boots.
+7. After login, check:
 
 ```bash
 ip -4 addr
@@ -64,6 +91,14 @@ tailscale status
 tailscale ip
 sudo systemctl restart tailscaled
 ```
+
+Verify Tailscale SSH stayed disabled:
+
+```bash
+tailscale debug prefs | grep -i '"RunSSH"'
+```
+
+Expected: `"RunSSH": false`.
 
 If SSH is refusing key auth, inspect the effective SSH config before editing:
 

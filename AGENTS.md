@@ -16,6 +16,12 @@ ssh pronav@100.103.66.92
 # User: pronav | Passwordless sudo | SSH key auth from Mac Mini
 ```
 
+`breakglass` is a local sudo fallback user with copied SSH public keys. Use it only for access
+recovery and keep its password outside this repo. Tailscale SSH is intentionally disabled because
+it can add browser approval to `ssh pronav@100.103.66.92` and interrupt deploy agents.
+
+Live recovery note on the server: `/home/pronav/server-recovery/PRSNL_RECOVERY.md`.
+
 ## Web Dashboards
 
 | Service | Local URL | Tailscale URL | Access | Purpose |
