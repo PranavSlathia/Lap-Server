@@ -58,6 +58,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - AUTOHEAL_CONTAINER_LABEL=all
+      - AUTOHEAL_START_PERIOD=300
+      - AUTOHEAL_INTERVAL=30
 
   portainer:
     image: portainer/portainer-ce:lts

@@ -313,8 +313,8 @@ in Key Config Files).
 ## OS & Software
 
 - Ubuntu Server 24.04 LTS (minimized)
-- Kernel: 6.8.0-124-generic
-- Docker: v29.5.2
+- Kernel: 6.8.0-136-generic
+- Docker: v29.6.2
 - Docker Compose: v5.1.4
 - Node.js: v22.22.2
 - Claude Code CLI: v2.1.92
@@ -331,6 +331,11 @@ in Key Config Files).
 - Gateway: 192.168.1.1
 - DNS: 8.8.8.8, 8.8.4.4
 - Config: `/etc/netplan/01-network.yaml`
+- Network owner: `systemd-networkd`; NetworkManager is disabled because all live
+  interfaces are unmanaged by it.
+- Apt online gate: `/etc/systemd/system/apt-daily.service.d/online.conf` and
+  `apt-daily-upgrade.service.d/online.conf` wait for `wlp6s0:routable`; the optional,
+  unplugged Ethernet interface does not block automatic updates.
 
 ### Tailscale VPN
 - Tailscale IP: 100.103.66.92
@@ -340,7 +345,7 @@ in Key Config Files).
 ### Firewall (UFW) — Current Rules
 
 ```
-UFW allow rules (verified 2026-06-11):
+UFW allow rules (verified 2026-07-28):
   22/tcp    → SSH, from anywhere (key-only, fail2ban). NOTE: fail2ban shows 0 bans
               over 9 days of uptime — the router almost certainly does not forward
               :22, so in practice SSH is LAN + Tailscale only.
@@ -348,6 +353,8 @@ UFW allow rules (verified 2026-06-11):
   19999/tcp → also from n8n-net docker bridge (172.24.0.0/16) — Quip alert checker
               reads host metrics from Netdata (read-only)
   8790/tcp  → from 172.24.0.0/16 only — Quip brain→agents consult bridge (bearer-gated)
+  6006/tcp  → from moc-net docker bridge (172.19.0.0/16) only — metadata-only MOC
+              OpenTelemetry export to Phoenix; it remains Tailscale-bound for the UI
 
 (Stale Langfuse :3030 rules removed 2026-06-11. Langfuse itself retired 2026-06-03 → Phoenix.)
 
@@ -355,9 +362,10 @@ Public traffic does NOT enter via UFW at all — it arrives via Cloudflare Tunne
 (outbound-only connection), which proxies to localhost:<port>. 80/443 are not
 forwarded by the router.
 
-Dockge (5001), pgweb (8081), Portainer edge (8000), n8n (5678), Phoenix (6006) are
-restricted by their Docker port binding to `100.103.66.92:` (Tailscale interface)
-rather than by UFW rules.
+Dockge (5001), pgweb (8081), Portainer edge (8000), and n8n (5678) are restricted by
+their Docker port binding to `100.103.66.92:` (Tailscale interface) rather than by UFW
+rules. Phoenix (6006) uses the same Tailscale binding plus the narrowly scoped moc-net
+exception above for in-host telemetry delivery.
 
 ⚠️ Remember: Docker-published ports on 0.0.0.0 bypass UFW (DOCKER iptables chain).
 Restrict containers by binding (`100.103.66.92:` / `127.0.0.1:`), not by UFW alone.
@@ -444,10 +452,8 @@ net.ipv4.tcp_tw_reuse=1                   # Reuse TIME_WAIT sockets
 
 Infrastructure compose: `~/docker/docker-compose.yml` (pgweb + dockge live in their own dirs).
 
-Note: `uptime-kuma` and `dozzle` currently run under hash-prefixed container names
-(`58892943e1b5_uptime-kuma`, `a61f323b94f8_dozzle`) — leftover from an interrupted compose
-recreate. Harmless, but `docker ps` greps and `docker restart uptime-kuma` by plain name will
-miss them; a future `docker compose up -d --force-recreate` of the infra stack will fix the names.
+Autoheal uses `AUTOHEAL_START_PERIOD=300` and `AUTOHEAL_INTERVAL=30` so normal post-boot
+database/model warm-up does not trigger a restart loop.
 
 ## Developer Tools on Server
 
