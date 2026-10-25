@@ -3,6 +3,9 @@
 This repo's durable source of truth is `CLAUDE.md`. Read it first before changing
 ports, compose files, firewall posture, or recovery docs.
 
+For the latest sanitized live snapshot, read `docs/CURRENT-STATUS.md` and then
+refresh it with `./scripts/health-check.sh tailscale` or `ssh pronav@100.103.66.92 'bash ~/bin/dell-status.sh'`.
+
 For incidents and recovery work, start with `SOS-RUNBOOK.md`.
 
 ## Access
@@ -31,6 +34,10 @@ Live recovery note on the server:
 - Check `CLAUDE.md` before assigning any port.
 - Treat `~/docker/*/.env`, backup archives, DB dumps, token files, and `*.bak*` files as secrets or operational state; never commit them.
 - Before overwriting a live compose file, use `scripts/deploy-compose.sh --dry-run`.
+- The secondary HDD (`/mnt/hdd`) is for cold archives and backup copies only. Never put live volumes or databases
+  on it, and never modify, move or format `/mnt/hdd/Pictures` (personal photos, possibly the only copy).
+- Before rebooting, list containers with restart policy `no`/`AutoRemove`: they will not come back.
+- Open follow-up work lives in `CLAUDE.md` → **Pending Tasks**.
 - Preserve normal OpenSSH over the Tailscale IP; do not enable Tailscale SSH unless the deploy workflow has been explicitly redesigned.
 
 ## Common Commands
@@ -38,7 +45,7 @@ Live recovery note on the server:
 ```bash
 ./scripts/health-check.sh tailscale
 ./scripts/deploy-compose.sh infra tailscale --dry-run
-./scripts/deploy-compose.sh n8n tailscale --dry-run
+# n8n/Quip retired 2026-08-20; the deploy script intentionally refuses that target.
 ```
 
 For the current port registry, deployed projects, Cloudflare routes, backup model,

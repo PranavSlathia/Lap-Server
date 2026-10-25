@@ -55,7 +55,7 @@ This particular Dell Vostro has an Intel Celeron 2957U (1.4GHz, 2 cores), 8GB RA
    │  │                                                                  │  │
    │  │  Project: Domain Hunter (~/docker/domain-hunter/)                │  │
    │  │    dh-api · vulture Discord bot · dh-scheduler                   │  │
-   │  │    dh-worker-{a2,rdap,wayback,classifier,scoring}                │  │
+   │  │    dh-worker-{a2,rdap,wayback,classifier,scoring,registrar}      │  │
    │  │    dh-pg (pgvector) · dh-redis                                   │  │
    │  │                                                                  │  │
    │  │  Project: GlitchTip — retired; old compose may remain for revival│  │
@@ -63,8 +63,7 @@ This particular Dell Vostro has an Intel Celeron 2957U (1.4GHz, 2 cores), 8GB RA
    │  │  Project: prsnl-landing (~/docker/landing/)                      │  │
    │  │    prsnl-landing (nginx) — public marketing page                 │  │
    │  │                                                                  │  │
-   │  │  Project: n8n (~/docker/n8n/) — workflow automation              │  │
-   │  │    n8n + runners + Postgres + Quip brain/Discord/WhatsApp sidecars│ │
+   │  │  n8n + Quip — retired 2026-08-20                                 │  │
    │  │                                                                  │  │
    │  │  Infra (shared, in ~/docker/docker-compose.yml):                 │  │
    │  │    Portainer · Dockge · Uptime Kuma · Dozzle · Netdata           │  │
@@ -125,7 +124,7 @@ Once on the Tailscale network, all dashboards become reachable:
 | Uptime Kuma | http://100.103.66.92:3001 | Monitor app/service uptime |
 | Dozzle | http://100.103.66.92:9999 | Live tail Docker logs |
 | Netdata | http://100.103.66.92:19999 | Real-time CPU/RAM/disk/network metrics |
-| n8n | http://100.103.66.92:5678 | Workflow automation (set up the owner account on first visit) |
+| Phoenix | http://100.103.66.92:6006 | MOC LLM-trace observability |
 
 ---
 
@@ -189,22 +188,26 @@ Lap-Server/
 ├── AGENT-BRIEFING.md      Quick context for AI agents deploying to this server
 ├── SOS-RUNBOOK.md         Break-glass incident and recovery guide
 ├── docs/
-│   ├── N8N-ARCHITECTURE.md   Detailed n8n runtime, security, Quip, and ntfy decisions
+│   ├── CURRENT-STATUS.md     Sanitized live snapshot from the latest verified server check
+│   ├── MAINTENANCE-*.md      Dated maintenance records (latest: 2026-10-25, HDD storage added)
+│   ├── N8N-ARCHITECTURE.md   Historical n8n/Quip architecture and restore context
 │   └── N8N-INTEGRATION-SHORTLIST.md   Yay/nay backlog for n8n nodes, helpers, and templates
 ├── configs/               Sanitized snapshots of server config files
 │   ├── docker-daemon.json
 │   ├── fail2ban-jail.local
 │   ├── netplan.yaml.example   (template — fill in your WiFi creds locally)
 │   ├── sysctl-server.conf
-│   └── unattended-upgrades.conf
+│   ├── unattended-upgrades.conf
+│   └── systemd/               hdd-backup-mirror.service + .timer
 ├── docker/
 │   ├── docker-compose.yml     Infrastructure stack (Portainer, monitoring, etc.)
 │   └── n8n/
-│       └── docker-compose.yml n8n workflow automation (+ Postgres); secrets in .env on the server
+│       └── docker-compose.yml historical restore source; live stack retired 2026-08-20
 └── scripts/
     ├── health-check.sh           Run a full server health check via SSH
     ├── deploy-compose.sh         Deploy docker-compose to the server
     ├── access-hardening.sh       Reapply SSH/breakglass/recovery-note hardening
+    ├── hdd-backup-mirror.sh      Nightly second copy of backups onto the /mnt/hdd HDD
     └── weekly-maintenance.sh     Comprehensive Sunday maintenance — runs as root cron, checks restic backup freshness, posts GitHub issue on warnings/critical
 ```
 
@@ -216,11 +219,16 @@ Lap-Server/
 |---------|-----|-------|
 | prsnl-landing | https://prsnl.fyi | nginx static landing page |
 | MindOverChatter | https://moc.prsnl.fyi | React + Hono + PostgreSQL+pgvector + embedding + Postgres graph projection |
-| Domain Hunter | Discord/Vulture + localhost API | FastAPI + SQLAlchemy + Postgres+pgvector + Redis + workers |
-| n8n / Quip | Tailscale: http://100.103.66.92:5678; gated public n8n via `n8n.prsnl.fyi` | Workflow automation + Quip brain/Discord/WhatsApp sidecars |
+| Domain Hunter | Discord/Vulture + localhost API | FastAPI + PostgreSQL+pgvector + Redis + scheduler/workers |
 | Phoenix | Tailscale: http://100.103.66.92:6006 | LLM trace observability |
+| Pranav Desk OS | LAN display + Tailscale admin | iPad display shell and admin API |
+| prsnl Ops Deck | Tailscale: http://100.103.66.92:8787 | Ops dashboard + ntfy + MQTT |
 
-Detailed n8n notes live in `docs/N8N-ARCHITECTURE.md`; candidate add-ons and external templates are tracked in `docs/N8N-INTEGRATION-SHORTLIST.md`.
+The former n8n/Quip architecture remains in `docs/N8N-ARCHITECTURE.md` for restore history only.
+
+**Storage:** the 240 GB SSD (`/`) runs everything live. Since 2026-10-25, the laptop's second disk, a
+500 GB HDD at `/mnt/hdd`, holds a nightly second copy of backups and cold archives. It never holds
+live data. See `CLAUDE.md` → Secondary HDD, and Pending Tasks for open follow-ups.
 
 ---
 

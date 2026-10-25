@@ -127,6 +127,12 @@ services:
       - N8N_RUNNERS_AUTH_TOKEN=${N8N_RUNNERS_AUTH_TOKEN:?set in .env}
       - N8N_RUNNERS_AUTO_SHUTDOWN_TIMEOUT=15
     networks: [n8n-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f task-runner-launcher >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     deploy:
       resources:
         limits:
@@ -150,6 +156,12 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks: [n8n-net]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:2375/_ping | grep -q OK"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -166,6 +178,12 @@ services:
       - N8N_INTERNAL_WEBHOOK=http://n8n:5678/webhook/quip
       - DISCORD_ENABLE_MESSAGE_CONTENT=true   # Message Content privileged intent enabled in the Dev Portal
     networks: [n8n-net]
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8787"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     deploy:
       resources:
         limits:
@@ -180,6 +198,12 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     networks: [n8n-net]
+    healthcheck:
+      test: ["CMD-SHELL", "caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -215,6 +239,12 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks: [n8n-net]
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8788"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     deploy:
       resources:
         limits:
@@ -231,6 +261,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks: [n8n-net]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health | grep -q '\"ok\":true'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     deploy:
       resources:
         limits:
@@ -264,3 +300,5 @@ volumes:
   quip-wa-auth:
     external: true
     name: quip-wa-auth
+# RETIRED 2026-08-20: historical restore source only. Do not deploy this stack unless Pranav
+# explicitly chooses to restore n8n/Quip from the sealed server recovery bundle.

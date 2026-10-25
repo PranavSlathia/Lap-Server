@@ -1,5 +1,12 @@
 # n8n Architecture on the Dell Server
 
+> **Retired 2026-08-20.** This document is retained as historical architecture and restore
+> context only. n8n and Quip containers, images, active volumes, live configuration directory,
+> and public gate were removed after checksum-verified database and configuration backups.
+> `n8n.prsnl.fyi` is parked at HTTP 404. Recovery material lives outside this repo at
+> `/home/pronav/server-recovery/retired/20260820T160354Z/`. Do not follow the deployment commands
+> below unless Pranav explicitly decides to restore the retired stack.
+
 This document is the durable reference for the self-hosted n8n deployment on the Dell home server (`prsnl`). It records what is live, why it is shaped this way, and which scaling/integration options are deliberately deferred.
 
 Last updated: 2026-06-01.
