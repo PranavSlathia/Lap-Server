@@ -140,7 +140,7 @@ fi
 # ── Check 8: UFW posture ───────────────────────────────────────
 UFW_STATE=$(ufw status | head -1)
 if [[ "$UFW_STATE" == *"Status: active"* ]]; then
-  PUBLIC_PORTS=$(ufw status | awk '/ALLOW/ && !/100\.64\.0\.0|192\.168\.1\.0|172\.24\.0\.0|127\.0\.0\.1/ && !/(v6)/ {print}' | grep -v '^$')
+  PUBLIC_PORTS=$(ufw status | awk '/ALLOW/ && !/100\.64\.0\.0|192\.168\.1\.0|172\.(1[6-9]|2[0-9]|3[0-1])\./ && !/127\.0\.0\.1/ && !/on tailscale0/ && !/(v6)/ {print}' | grep -v '^$')
   # Expected public-allow rules: 22 (ssh) only. Cloudflare Tunnel uses outbound.
   UNEXPECTED_PUBLIC=$(echo "$PUBLIC_PORTS" | awk '{print $1}' | grep -vE '^(22|22/tcp|OpenSSH|Anywhere)$' | grep -v '^$' || true)
   heal "UFW active"
@@ -167,12 +167,13 @@ if systemctl is-active cloudflared >/dev/null 2>&1; then
   # Filter out known-benign noise:
   #   - "sendmsg: network is unreachable" — transient ISP blips, auto-reconnects
   #   - "stream X canceled by remote with error code 0" — clean SSE client disconnects
-  CF_ERRORS_REAL=$(journalctl -u cloudflared --since "7 days ago" --no-pager 2>/dev/null \
+  #   - context-canceled/connection-terminated bursts — normal tunnel shutdown/restart noise
+  CF_ERRORS_REAL=$(journalctl -u cloudflared --since "24 hours ago" --no-pager 2>/dev/null \
     | grep -iE 'ERR|error' \
-    | grep -vE 'sendmsg: network is unreachable|stream [0-9]+ canceled by remote with error code 0' \
+    | grep -vE 'sendmsg: network is unreachable|stream [0-9]+ canceled by remote with error code 0|context canceled|accept stream listener encountered a failure while serving|Connection terminated|no more connections active|Application error 0x0 \(remote\)' \
     | wc -l)
-  if   [[ $CF_ERRORS_REAL -gt 20 ]]; then warn "cloudflared has $CF_ERRORS_REAL non-benign errors in last 7d"
-  else                                    heal "cloudflared active ($CF_ERRORS_REAL non-benign errors in 7d)"
+  if   [[ $CF_ERRORS_REAL -gt 20 ]]; then warn "cloudflared has $CF_ERRORS_REAL non-benign errors in last 24h"
+  else                                    heal "cloudflared active ($CF_ERRORS_REAL non-benign errors in 24h)"
   fi
 else
   crit "cloudflared service not active"
@@ -284,12 +285,30 @@ done < <(docker ps --format '{{.Names}}')
 
 # ── Auto-fix: image prune (dangling only) ─────────────────────
 if [[ $DRY_RUN -eq 0 ]]; then
-  PRUNED_IMG=$(docker image prune -af 2>&1 | tail -1 | grep -oE 'reclaimed[^[:space:]]+([^$]*)' || true)
-  PRUNED_CON=$(docker container prune -f --filter 'until=168h' 2>&1 | tail -1 | grep -oE 'reclaimed[^[:space:]]+([^$]*)' || true)
+  PRUNED_IMG=$(docker image prune -f 2>&1 | tail -1 | grep -oE 'reclaimed[^[:space:]]+([^$]*)' || true)
   [[ -n "$PRUNED_IMG" ]] && fix "docker image prune: $PRUNED_IMG"
-  [[ -n "$PRUNED_CON" ]] && fix "docker container prune (>7d stopped): $PRUNED_CON"
 else
-  fix "(dry-run) would prune unused docker images and containers >7d"
+  fix "(dry-run) would prune dangling docker images"
+fi
+
+# ── Auto-fix: BuildKit cache prune ────────────────────────────
+# This only removes rebuild cache, not images, containers, volumes, or backups.
+# The 2026-06-29 and 2026-07-09 manual runs each reclaimed over 69GB here.
+# Retain a week of cache normally, but clear all cache when root disk is already under pressure.
+if [[ $DRY_RUN -eq 0 ]]; then
+  if [[ $DISK_USE -ge 80 ]]; then
+    BUILDKIT_PRUNE=$(docker builder prune -af 2>&1 | tail -1 || true)
+    [[ -n "$BUILDKIT_PRUNE" ]] && fix "docker builder prune (all cache; root was ${DISK_USE}%): $BUILDKIT_PRUNE"
+  else
+    BUILDKIT_PRUNE=$(docker builder prune -af --filter 'until=168h' 2>&1 | tail -1 || true)
+    [[ -n "$BUILDKIT_PRUNE" ]] && fix "docker builder prune (>7d cache): $BUILDKIT_PRUNE"
+  fi
+else
+  if [[ $DISK_USE -ge 80 ]]; then
+    fix "(dry-run) would prune all BuildKit cache because root is ${DISK_USE}%"
+  else
+    fix "(dry-run) would prune BuildKit cache older than 7d"
+  fi
 fi
 
 # ── Auto-fix: harden any docker.sock-mounted container missing healthcheck ──

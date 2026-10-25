@@ -6,7 +6,7 @@ usage() {
 Deploy a tracked compose file to the Dell server.
 
 Usage:
-  ./scripts/deploy-compose.sh [infra|n8n] [local|tailscale] [--dry-run] [--yes]
+  ./scripts/deploy-compose.sh infra [local|tailscale] [--dry-run] [--yes]
 
 Defaults:
   target: infra
@@ -14,7 +14,9 @@ Defaults:
 
 Examples:
   ./scripts/deploy-compose.sh infra tailscale --dry-run
-  ./scripts/deploy-compose.sh n8n tailscale --yes
+
+n8n/Quip was retired on 2026-08-20. Its tracked compose is historical restore
+source only and this script intentionally refuses to redeploy it.
 
 The script copies to a temporary remote candidate, validates it with
 `docker compose config -q`, shows a diff, backs up the current remote compose,
@@ -41,6 +43,12 @@ for arg in "$@"; do
       ;;
   esac
 done
+
+if [[ "$TARGET" == "n8n" ]]; then
+  echo "Refusing deployment: n8n/Quip was retired on 2026-08-20." >&2
+  echo "Use the sealed server recovery bundle only after an explicit restore decision." >&2
+  exit 1
+fi
 
 if [[ "$NETWORK" == "tailscale" ]]; then
   HOST="100.103.66.92"
