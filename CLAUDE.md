@@ -4,6 +4,32 @@ This repo manages the Dell Vostro laptop converted into an Ubuntu home server on
 
 For incidents and recovery work, start with `SOS-RUNBOOK.md`.
 
+## Secondary HDD storage — 2026-10-25
+
+A second disk (500 GB Toshiba HDD, NTFS) is mounted at **`/mnt/hdd`** for **cold storage and a second
+copy of backups only**. Never use it for live databases. `/mnt/hdd/Pictures` holds personal photos:
+never touch them. Details are under Hardware → "Secondary HDD". Open work is in **Pending Tasks** at
+the end of this file. Maintenance record: `docs/MAINTENANCE-2026-10-25.md`.
+
+## Retirement and restoration snapshot — 2026-08-20
+
+- **n8n and Quip are retired.** Their containers, active data volumes, unused images, n8n working
+  directory, and obsolete firewall rules were removed. The disabled/inactive 56MB `quip-agents`
+  source directory remains as low-cost recovery material. Do not redeploy them without an explicit
+  restore decision.
+- **Domain Hunter is active and protected.** It was restored from the verified pre-removal
+  configuration and PostgreSQL archive on 2026-08-20 after an erroneous removal, then upgraded on
+  2026-08-21 to an eight-container always-on acquisition-research stack. The project, database,
+  backup timer, Vulture bot, and `dh-dell` runner remain; only the dead scheduler and three old
+  default/opt-in worker containers were removed.
+- `n8n.prsnl.fyi` is parked at `http_status:404`. `xd.prsnl.fyi` remains parked because the old
+  Domain Hunter web dashboard had already been removed; Domain Hunter operates through Vulture and
+  its localhost API.
+- Recovery material is checksum-verified and stored outside this repo at
+  `/home/pronav/server-recovery/retired/20260820T160354Z/` (mode `0700`; files mode `0600`).
+- Phoenix remains active for MOC observability. Its `default` project has a seven-day trace
+  retention policy scheduled daily at `01:00 UTC`.
+
 ## Quick Access
 
 ```bash
@@ -44,8 +70,8 @@ Live recovery note on the server: `/home/pronav/server-recovery/PRSNL_RECOVERY.m
 | Portainer | SSH tunnel only | https://100.103.66.92:9443 | Tailscale only | Docker management UI |
 | Uptime Kuma | SSH tunnel only | http://100.103.66.92:3001 | Tailscale only | Uptime monitoring |
 | Dozzle | SSH tunnel only | http://100.103.66.92:9999 | Tailscale only | Live Docker log viewer |
-| Netdata | SSH tunnel only | http://100.103.66.92:19999 | Tailscale only | Real-time system metrics |
-| Phoenix | SSH tunnel only | http://100.103.66.92:6006 | Tailscale only | LLM trace observability (Quip brain) |
+| Netdata | — | ~~http://100.103.66.92:19999~~ | — | **Not deployed** as of 2026-10-25 (see Pending Tasks) |
+| Phoenix | SSH tunnel only | http://100.103.66.92:6006 | Tailscale only | MOC LLM-trace observability |
 
 ---
 
@@ -67,7 +93,7 @@ Live recovery note on the server: `/home/pronav/server-recovery/PRSNL_RECOVERY.m
 | 8081 | pgweb | pgweb | Tailscale only | Bound to `100.103.66.92` |
 | 9443 | Portainer | portainer | Tailscale only | Bound to `100.103.66.92` |
 | 9999 | Dozzle | dozzle | Tailscale only | Bound to `100.103.66.92` |
-| 19999 | Netdata | netdata | Tailscale only | System metrics (+ allowed from n8n-net `172.24.0.0/16` for Quip alert checker) |
+| 19999 | Netdata | — | — | Not deployed as of 2026-10-25; port reserved pending decision |
 
 > **Gotcha:** a Docker `ports: "X:X"` publish binds `0.0.0.0` and **bypasses UFW** (DOCKER iptables
 > chain), so "UFW doesn't allow it" ≠ "not exposed" — it's LAN-reachable. Always bind admin UIs to
@@ -78,18 +104,21 @@ Live recovery note on the server: `/home/pronav/server-recovery/PRSNL_RECOVERY.m
 | Port | Project | Service | Container | Access | Compose File |
 |------|---------|---------|-----------|--------|-------------|
 | 3000 | MindOverChatter | Hono backend API | moc-server | Localhost only | ~/docker/moc/docker-compose.prod.yml |
+| 4111-4112 | MindOverChatter | Mastra ops server | moc-mastra-ops-server | Tailscale only (`100.103.66.92`; both host ports map to container `4111`) | ~/docker/moc/docker-compose.prod.override.yml |
 | 5173 | MindOverChatter | React frontend (nginx) | moc-web | Public (via tunnel) | ~/docker/moc/docker-compose.prod.yml |
 | 5433 | MindOverChatter | PostgreSQL + pgvector | moc-db | Internal only | ~/docker/moc/docker-compose.prod.yml |
-| 8004 | MindOverChatter | Embedding service | moc-embedding | Localhost only | ~/docker/moc/docker-compose.prod.yml |
-| 8006 | MindOverChatter | Graph consolidator | moc-graph-consolidator | Localhost only | ~/docker/moc/docker-compose.prod.yml |
 | 5436 | Domain Hunter | PostgreSQL + pgvector | dh-pg | Localhost only | ~/docker/domain-hunter/compose.yml |
 | 6381 | Domain Hunter | Redis | dh-redis | Localhost only | ~/docker/domain-hunter/compose.yml |
+| 8004 | MindOverChatter | Embedding service | moc-embedding | Localhost only | ~/docker/moc/docker-compose.prod.yml |
+| 8006 | MindOverChatter | Graph consolidator | moc-graph-consolidator | Localhost only | ~/docker/moc/docker-compose.prod.yml |
 | 8007 | Domain Hunter | FastAPI API | dh-api | Localhost only | ~/docker/domain-hunter/compose.yml |
 | 8088 | prsnl-landing | nginx static | prsnl-landing | Public (via tunnel) | ~/docker/landing/ |
-| 5678 | n8n | Workflow automation UI/API | n8n | Tailscale + localhost | ~/docker/n8n/docker-compose.yml |
-| 8090 | Quip | Caddy basic-auth gate → n8n | quip-n8n-gate | Localhost (tunnel origin) | ~/docker/n8n/docker-compose.yml |
-| 6006 | Quip/observability | Phoenix LLM-trace UI + OTLP | phoenix | Tailscale only (`100.103.66.92`) | ~/docker/phoenix/docker-compose.yml |
-| 8790 | Quip | quip-agents `/run` bridge (host systemd, not docker) | — | n8n-net only (`172.24.0.0/16`, bearer-gated) | /home/agent/quip-agents |
+| 6006 | MOC observability | Phoenix LLM-trace UI + OTLP | phoenix | Tailscale only (`100.103.66.92`) | ~/docker/phoenix/docker-compose.yml |
+| 1883 | prsnl Ops Deck | MQTT broker | prsnl-mosquitto | Tailscale only (`100.103.66.92`) | ~/docker/prsnl-ops-deck/deploy/docker-compose.yml |
+| 8787 | prsnl Ops Deck | Operations dashboard | prsnl-ops-deck | Tailscale only (`100.103.66.92`) | ~/docker/prsnl-ops-deck/deploy/docker-compose.yml |
+| 8788 | prsnl Ops Deck | ntfy notifications | prsnl-ntfy | Tailscale only (`100.103.66.92`) | ~/docker/prsnl-ops-deck/deploy/docker-compose.yml |
+| 8791 | Pranav Desk OS | iPad display shell + device API | pranav-desk-os-display | Home LAN only (`192.168.1.18`) | ~/docker/deskos/docker-compose.yml |
+| 8792 | Pranav Desk OS | `/manage` editor + admin API | pranav-desk-os-admin | Tailscale only (`100.103.66.92`) | ~/docker/deskos/docker-compose.yml |
 
 **Graph store note:** FalkorDB is **deprecated** — MOC's knowledge graph was cut over to
 **Postgres** (`moc-db`, graph projection owned by `moc-graph-consolidator`;
@@ -97,7 +126,10 @@ Live recovery note on the server: `/home/pronav/server-recovery/PRSNL_RECOVERY.m
 The old `moc-falkordb-1` container (6380) and the Mac Mini FalkorDB (`100.111.147.100:6379`)
 are no longer in MOC's runtime path. Cutover tooling: `services/graph-consolidator/scripts/falkor_postgres_cutover.py`.
 
-**Workers / internal-only (no host ports):** dh-scheduler, dh-worker-{registrar,a2,rdap,wayback,classifier,scoring}, vulture (DH Discord bot), moc-worker, n8n-runners, n8n-db (internal 5432), quip-db (internal 5432), quip-brain (internal 8080), quip-discord-bot (internal 8787), quip-whatsapp, quip-action-executor (internal 8788), quip-docker-proxy (internal 2375, read-only socket proxy).
+**Workers / internal-only (no host ports):**
+`dh-worker-{inventory,rdap,wayback,scoring}`, `vulture`, `moc-worker`, and MOC's internal
+voice/LiveKit components. Domain Hunter A2/classifier and registrar workers exist only in explicit
+profiles; the scheduler is retired. The n8n and Quip workers were removed on 2026-08-20.
 
 ### Available Port Ranges for New Projects
 
@@ -106,17 +138,46 @@ are no longer in MOC's runtime path. Cutover tooling: `services/graph-consolidat
 | 3100-3199 | Web backends |
 | 4000-4999 | APIs |
 | 5174-5435 | Frontends |
-| 5437-5499 | Databases |
+| 5437-5499 | Databases (5436 is Domain Hunter PostgreSQL) |
 | 6000-6379 | Misc services (6006 taken: Phoenix) |
-| 6382-6999 | Misc services |
+| 6382-6999 | Misc services (6381 is Domain Hunter Redis) |
 | 7000-7999 | Misc services |
 | 8012-8087 | Python/ML services |
-| 8091-8789 | Python/ML services (8090 taken: quip-n8n-gate) |
-| 8791-8999 | Python/ML services (8790 taken: quip-agents) |
+| 8090-8786 | Python/ML services (8787-8788 taken by Ops Deck) |
+| 8789-8790, 8793-8999 | Python/ML services (8791-8792 Desk OS) |
 
 ---
 
 ## Deployed Projects
+
+### Pranav Desk OS
+
+**Deployed:** 2026-08-01
+
+**Server path:** `~/docker/deskos/`
+
+**Display:** `http://192.168.1.18:8791`
+**Admin:** `http://100.103.66.92:8792/manage`
+
+| Container | Port | Status | Notes |
+|-----------|------|--------|-------|
+| pranav-desk-os-display | `192.168.1.18:8791` | Running (healthy) | ES5 iPad shell and paired-device API; no admin routes |
+| pranav-desk-os-admin | `100.103.66.92:8792` | Running (healthy) | Tailscale-only editor/admin API; no device routes |
+
+The root filesystems are read-only, containers run as UID/GID `1000:1000` with all capabilities dropped, and the Docker socket is not mounted. `deskos-collector.service` writes an atomic allowlisted host snapshot every 15 seconds; `deskos-backup.timer` makes daily SQLite online backups with 14-day retention. The admin listener also owns `POST /api/v1/work/events`, authenticated by a dedicated hash-only Work Pulse token; the display listener returns 404 for that route. A fail-open macOS lifecycle-hook relay sends only allowlisted Claude/Codex state over Tailscale, never prompts or transcripts. Port `8790` was freed when the Quip bridge was retired.
+
+### prsnl Ops Deck
+
+**Server path:** `~/docker/prsnl-ops-deck/deploy/`
+**Dashboard:** `http://100.103.66.92:8787` (Tailscale only)
+
+| Container | Port | Status | Purpose |
+|-----------|------|--------|---------|
+| `prsnl-ops-deck` | `100.103.66.92:8787` | Running (healthy) | Private operations dashboard |
+| `prsnl-ntfy` | `100.103.66.92:8788` | Running (healthy) | Private notification rail |
+| `prsnl-mosquitto` | `100.103.66.92:1883` | Running (healthy) | Private MQTT broker |
+
+All three listeners are bound to the Tailscale address and allowed only on `tailscale0` by UFW.
 
 ### 0. prsnl-landing
 
@@ -142,9 +203,10 @@ drop `NAME.html` into `~/docker/landing/dist/` and nginx `try_files $uri.html` s
 | moc-web | nginx:alpine | 5173 | Running | React SPA + reverse proxy |
 | moc-server | moc-server (custom) | 3000 | Running (healthy) | Hono backend |
 | moc-db | pgvector/pgvector:pg16 | 5433 | Running (healthy) | PostgreSQL + pgvector — also the **graph store** (FalkorDB deprecated) |
-| moc-embedding | moc-embedding (custom) | 8004 | Running (healthy) | Embedding service (~3.5GB) |
-| moc-worker | moc-worker (custom) | (internal) | Running | Background work |
+| moc-embedding | moc-embedding (custom) | 8004 | Running (healthy) | Embedding service; image is ~5.31GB, mostly Python/ML deps |
+| moc-worker | moc-worker (custom) | (internal) | Running (healthy) | Background work; shares ~3.88GB server/worker image |
 | moc-graph-consolidator | moc-graph-consolidator | 8006 | Running (healthy) | Owns Postgres graph projection writes (`graphBackend: postgres`) |
+| moc-mastra-ops-server | moc-mastra-ops:local | 4111, 4112 | Running (healthy) | Tailscale-only ops server; override compose maps both host ports to container `4111` |
 
 **Cloudflare Tunnel:**
 - Tunnel ID: `7959ea52-7f58-4657-b933-f785af2c87ad`
@@ -199,36 +261,49 @@ sudo docker restart moc-web
 
 ### 2. Domain Hunter (XD)
 
+**Active, restored 2026-08-20, and upgraded 2026-08-21.** The server checkout and PostgreSQL state
+were restored from the checksum-verified pre-removal archive. The eight-container default stack is
+healthy, `dh-pg-backup.timer` is active, and the `dh-dell` GitHub Actions runner is online. The
+sealed archive remains available as a recovery point. Never retire or remove this project without
+an explicit new instruction from Pranav.
+
 **Public URL:** none — `xd.prsnl.fyi` is parked (`http_status:404` in the tunnel; the `dh-web`
 dashboard container was removed). Operated via **Vulture** (Discord bot, `vulture` container) +
-the daily Discord digest + Tailscale/`dh-api`.
+Tailscale/`dh-api`. Vulture slash commands work; automatic daily channel posting is currently off
+because `DH_DISCORD_CHANNEL_ID` is not configured.
 **Deployed:** 2026-05-14
 **Repo:** github.com/PranavSlathia/XD
 **Server path:** ~/docker/domain-hunter/
-**Compose:** ~/docker/domain-hunter/compose.yml (profiles: foundation / api / workers / all)
-**Deploy mode:** Self-hosted GitHub Actions runner on the Dell (`actions.runner.PranavSlathia-XD.dh-dell`). Every push to `main` rebuilds `dh-api` and restarts it.
+**Compose:** ~/docker/domain-hunter/compose.yml (default plus `experimental` and
+`hand-registration` opt-in profiles)
+**Deploy mode:** Self-hosted GitHub Actions runner on the Dell
+(`actions.runner.PranavSlathia-XD.dh-dell`). Relevant pushes to `main` run unit and real-Postgres
+tests, create a database backup, migrate, rebuild, and reconcile the default stack.
 
-Self-hosted expired-domain discovery + scoring pipeline. Ingest GitHub README citations → DNS NXDOMAIN filter → Open PageRank enrich → RDAP availability → Wayback CDX → composite scoring → daily Discord digest.
+Self-hosted, evidence-first expiring-domain research pipeline. Every six hours it narrows the
+public DropCatch five-day pending-delete feed through cached OpenPageRank authority, conservative
+NameBio retail-demand evidence, acquisition details, anomaly gates, RDAP, and Wayback. Output is
+`research`, `observe`, or `reject`; it never buys, bids, backorders, lists, or spends.
 
 | Container | Image | Port | Status |
 |-----------|-------|------|--------|
 | dh-api | domain-hunter-dh-api | 8007 | FastAPI HTTP API |
-| dh-scheduler | domain-hunter-dh-scheduler | — | APScheduler cron jobs (digest) |
-| dh-worker-a2 | domain-hunter-dh-worker-a2 | — | GitHub README ingest |
-| dh-worker-rdap | domain-hunter-dh-worker-rdap | — | DNS + OPR + RDAP enrich |
-| dh-worker-wayback | domain-hunter-dh-worker-wayback | — | Wayback CDX |
-| dh-worker-classifier | domain-hunter-dh-worker-classifier | — | Codex CLI safety classifier |
+| dh-worker-inventory | domain-hunter-dh-worker-inventory | — | Six-hour pending-delete discovery and evidence scoring |
+| dh-worker-rdap | domain-hunter-dh-worker-rdap | — | Authoritative registration/lifecycle confirmation |
+| dh-worker-wayback | domain-hunter-dh-worker-wayback | — | Bounded archive-history enrichment |
 | dh-worker-scoring | domain-hunter-dh-worker-scoring | — | Composite scoring v3 |
-| dh-worker-registrar | domain-hunter-dh-worker-registrar | — | Registrar checks |
 | vulture | (custom) | — | Discord operator bot (`Vulture#1112`, slash commands) |
 | dh-pg | pgvector/pgvector:pg16 | 5436 | Postgres + pgvector |
-| dh-redis | redis:7-alpine | 6381 | Worker queue + pub/sub |
+| dh-redis | redis:7-alpine | 6381 | Isolated Redis state |
 
 (`dh-web` operator dashboard: **removed**.)
 
-**Env file:** `~/docker/domain-hunter/.env` (chmod 600) — see repo README for the required keys (DH_GITHUB_TOKEN, DH_OPENPAGERANK_API_KEY, DH_WHOISJSON_API_KEY, DH_DISCORD_WEBHOOK_URL, DH_SENTRY_DSN, etc.).
+**Env file:** `~/docker/domain-hunter/.env` (chmod 600) — see the repo README. The default inventory
+path needs no marketplace credential. Downloaded reference data lives under `/var/data/dh/reference`.
 
-**External integrations wired:** Open PageRank (DomCop), WhoisJSON, Discord webhook.
+**External integrations wired:** DropCatch public downloads/details, OpenPageRank public Top-10M,
+NameBio RetailStats (attribution required), ICANN RDAP, Wayback CDX, and Vulture. The new
+OpenPageRank API key and hand-registration profile are optional.
 ⚠️ GlitchTip was **retired** (see §3) — if `DH_SENTRY_DSN` is still set in `.env`, DH error
 events go nowhere; unset it or point at a live sink.
 
@@ -243,7 +318,12 @@ Anything still pointing a Sentry DSN at it (e.g. `DH_SENTRY_DSN`) is shipping ev
 
 ---
 
-### 4. n8n (workflow automation)
+### 4. n8n (workflow automation) — ⚪ RETIRED 2026-08-20
+
+**Historical section only.** All 17 workflows were inactive and there had been no executions in
+the preceding week. The four-container stack, images, data volumes, server directory, and public
+gate were removed after a verified `pg_dump` plus configuration archive. `n8n.prsnl.fyi` now
+returns 404.
 
 **Access:** Tailscale at http://100.103.66.92:5678; also public at https://n8n.prsnl.fyi behind a Caddy HTTP Basic-Auth gate (`quip-n8n-gate`, 127.0.0.1:8090). Cloudflare Access was the intended gate but Zero Trust requires a card; the Caddy basic-auth proxy is the card-free perimeter. n8n's own owner login sits behind it.
 **Deployed:** 2026-06-01
@@ -271,7 +351,11 @@ Config notes:
 
 ---
 
-### 5. Quip (Discord-first ops assistant)
+### 5. Quip (Discord-first ops assistant) — ⚪ RETIRED 2026-08-20
+
+**Historical section only.** Quip's remaining database volume and n8n gate were archived and
+removed; `quip-agents.service` remains disabled/inactive. Phoenix is not retired: it now serves
+active MOC telemetry and is documented as MOC observability.
 
 **Frontend:** Discord (bot `Quip#7007` + specialist agents). No public web UI.
 **Deployed:** 2026-06-02 onward
@@ -306,17 +390,42 @@ in Key Config Files).
 | CPU | Intel Celeron 2957U @ 1.4GHz (2C/2T) |
 | RAM | 8 GB (7.7 GB usable) |
 | Storage | Kingston A400 240GB SSD (218GB usable) |
+| Second disk | Toshiba MQ01ABF050 500GB HDD (`sda3`, NTFS) mounted at `/mnt/hdd` (ntfs3, `nofail`). See "Secondary HDD" below. |
 | WiFi | wlp6s0 — connected to Airtel_renu_8079 |
 | Ethernet | enp7s0 — DHCP (backup) |
 | Hostname | prsnl |
 
+### Secondary HDD (`/mnt/hdd`) — added 2026-10-25
+
+- **`/mnt/hdd/Pictures/` holds about 24k personal photos (35 GB). Never modify, move or format.**
+  The plan for some later date: copy them to the Mac, verify, then reformat the whole disk as ext4.
+- `fstab`: `UUID=1AD04DDBD04DBDAF /mnt/hdd ntfs3 …,uid=1000,gid=1000,fmask=0177,dmask=0077,nofail`.
+  If the disk dies, boot still continues.
+- Our data lives under `/mnt/hdd/prsnl/`:
+  - `backup-mirror/` is the second copy of the backups. `hdd-backup-mirror.timer` runs daily at 05:15 UTC
+    (`~/bin/hdd-backup-mirror.sh`, repo `scripts/` + `configs/systemd/`). It mirrors restic-moc
+    exactly and checks that its snapshots match the source. MOC dumps, DH pg dumps and Desk OS backups
+    are mirrored with history: removed files go to `.retired/<name>/<date>/` and expire after 60 days.
+    `LAST_SUCCESS` holds the time of the last good run.
+  - `aws-account-backups/` holds the AWS account 999200449801 backup (closed account; **only local
+    copy**, plus Google Drive). It contains the original `.tar.gz` (md5 verified) and a `.tar.zst` of the
+    backup root. It was moved off the SSD on 2026-10-25; the `aws-backup-*` units are disabled.
+  - `cold-archive/` holds verified `.tar.zst` archives of cold MOC gate/integrity backups moved off the
+    SSD. `MANIFEST.tsv` gives the original path and sha256 for each one.
+- ntfs3 stores Unix ownership and modes for files Linux creates. The cold and AWS archives were written by root
+  (root-only, mode 0600), so read them with `sudo`. They are tarballs anyway, so restores keep the original modes.
+- Not for live databases or containers. It's a 5400 rpm laptop drive; use it only as a second copy or for cold storage.
+- Kernel arg `libata.force=1:3.0G` (`/etc/default/grub.d/90-sata-link-cap.cfg`) caps this port. SMART
+  attribute 199 (UDMA_CRC) still rises at about 0.75 per MB transferred at any link speed, with zero
+  kernel ATA errors. That's a firmware counting quirk, not a cable fault. smartd monitors both disks.
+
 ## OS & Software
 
 - Ubuntu Server 24.04 LTS (minimized)
-- Kernel: 6.8.0-136-generic
-- Docker: v29.6.2
-- Docker Compose: v5.1.4
-- Node.js: v22.22.2
+- Kernel: 6.8.0-147-generic
+- Docker: v29.9.2
+- Docker Compose: v5.6.1
+- Node.js: v24.22.1
 - Claude Code CLI: v2.1.92
 - GitHub CLI: v2.45.0 (authenticated as PranavSlathia)
 - Gemini CLI: installed via npm
@@ -340,21 +449,20 @@ in Key Config Files).
 ### Tailscale VPN
 - Tailscale IP: 100.103.66.92
 - Account: `<your-tailscale-account>` (see local notes)
-- Devices on tailnet: Mac Mini (configured), MacBook Air (pending), iPhone (pending)
+- Devices observed 2026-06-29: Dell server (`prsnl`), Mac Mini (`pranavs-mac-mini`), active macOS peer (`prsnl-1`), iPhone (`iphone183`, offline/last seen 81 days ago)
 
 ### Firewall (UFW) — Current Rules
 
 ```
-UFW allow rules (verified 2026-07-28):
-  22/tcp    → SSH, from anywhere (key-only, fail2ban). NOTE: fail2ban shows 0 bans
-              over 9 days of uptime — the router almost certainly does not forward
+UFW allow rules (verified 2026-10-25):
+  22/tcp    → SSH, from anywhere (key-only, fail2ban). NOTE: fail2ban showed 0 failures
+              and 0 bans on 2026-10-25; the router likely does not forward
               :22, so in practice SSH is LAN + Tailscale only.
   3001, 9443, 9999, 19999 → from Tailscale (100.64.0.0/10) only
-  19999/tcp → also from n8n-net docker bridge (172.24.0.0/16) — Quip alert checker
-              reads host metrics from Netdata (read-only)
-  8790/tcp  → from 172.24.0.0/16 only — Quip brain→agents consult bridge (bearer-gated)
-  6006/tcp  → from moc-net docker bridge (172.19.0.0/16) only — metadata-only MOC
-              OpenTelemetry export to Phoenix; it remains Tailscale-bound for the UI
+              (19999/Netdata is stale: Netdata is not deployed — see Pending Tasks)
+  6006/tcp  → from moc-net docker bridge (172.19.0.0/16) only, on 100.103.66.92 —
+              metadata-only MOC OpenTelemetry export to Phoenix; the UI stays Tailscale-bound
+(The Quip-era 19999-from-n8n-net and 8790 rules are gone since the 2026-08-20 retirement.)
 
 (Stale Langfuse :3030 rules removed 2026-06-11. Langfuse itself retired 2026-06-03 → Phoenix.)
 
@@ -362,19 +470,17 @@ Public traffic does NOT enter via UFW at all — it arrives via Cloudflare Tunne
 (outbound-only connection), which proxies to localhost:<port>. 80/443 are not
 forwarded by the router.
 
-Dockge (5001), pgweb (8081), Portainer edge (8000), and n8n (5678) are restricted by
-their Docker port binding to `100.103.66.92:` (Tailscale interface) rather than by UFW
-rules. Phoenix (6006) uses the same Tailscale binding plus the narrowly scoped moc-net
+Dockge (5001), pgweb (8081), and Portainer edge (8000) are restricted by their Docker
+port binding to `100.103.66.92:` (Tailscale interface) rather than by UFW rules.
+Phoenix (6006) uses the same Tailscale binding plus the narrowly scoped moc-net
 exception above for in-host telemetry delivery.
 
 ⚠️ Remember: Docker-published ports on 0.0.0.0 bypass UFW (DOCKER iptables chain).
 Restrict containers by binding (`100.103.66.92:` / `127.0.0.1:`), not by UFW alone.
 
 Internal or localhost-only:
-  dh-pg (5436), dh-redis (6381), dh-api (8007),
   moc-db, moc-server (3000), moc-embedding (8004), moc-graph-consolidator (8006),
-  n8n-runners (5679), n8n-db, quip-db, quip-brain, quip-action-executor,
-  quip-docker-proxy, quip-n8n-gate (127.0.0.1:8090), prsnl-landing (127.0.0.1:8088)
+  prsnl-landing (127.0.0.1:8088)
 ```
 
 ## Security
@@ -445,15 +551,16 @@ net.ipv4.tcp_tw_reuse=1                   # Reuse TIME_WAIT sockets
 | dockge | louislam/dockge:1 | Compose stack manager (port 5001) | always |
 | uptime-kuma | louislam/uptime-kuma:1 | Uptime monitoring | always |
 | dozzle | amir20/dozzle:latest | Docker log viewer | always |
-| netdata | netdata/netdata | Real-time system monitoring | always |
+| netdata | — | Not deployed as of 2026-10-25 (no container/image) | — |
 | pgweb | sosedoff/pgweb:latest | Postgres web UI (port 8081) | always |
 | watchtower | containrrr/watchtower | Auto-update containers | always |
 | autoheal | willfarrell/autoheal | Restart unhealthy containers | always |
 
 Infrastructure compose: `~/docker/docker-compose.yml` (pgweb + dockge live in their own dirs).
 
-Autoheal uses `AUTOHEAL_START_PERIOD=300` and `AUTOHEAL_INTERVAL=30` so normal post-boot
-database/model warm-up does not trigger a restart loop.
+Autoheal uses `AUTOHEAL_START_PERIOD=300` and `AUTOHEAL_INTERVAL=30` (verified 2026-10-25) so
+normal post-boot database/model warm-up does not trigger a restart loop. `uptime-kuma` and
+`dozzle` run under their normal container names.
 
 ## Developer Tools on Server
 
@@ -479,7 +586,7 @@ database/model warm-up does not trigger a restart loop.
 | File | Purpose |
 |------|---------|
 | `/etc/netplan/01-network.yaml` | WiFi + Ethernet config |
-| `/etc/docker/daemon.json` | Docker daemon settings |
+| `/etc/docker/daemon.json` | Docker daemon settings: json-file log rotation, overlay2, live-restore, DNS pinned to `1.1.1.1`/`8.8.8.8` |
 | `/etc/fail2ban/jail.local` | Fail2ban rules |
 | `/etc/sysctl.d/99-server.conf` | Kernel tuning |
 | `/etc/systemd/logind.conf` | Lid close behavior |
@@ -492,8 +599,12 @@ database/model warm-up does not trigger a restart loop.
 | `~/docker/moc/.env` | MOC environment variables |
 | `~/bin/moc-backup-restic.sh` | MOC restic backup script |
 | `/etc/systemd/system/moc-backup.timer` | MOC daily backup timer |
-| `~/bin/quip-db-backup.sh` | Quip DB (quip-db) restic backup script — repo `~/backups/restic-quip`, key `~/.restic-quip.key` |
-| `/etc/systemd/system/quip-db-backup.timer` | Quip DB nightly backup timer (03:25 UTC) |
+| `/etc/fstab` (`/mnt/hdd` entry) | Secondary HDD mount (ntfs3, `nofail`) |
+| `/etc/default/grub.d/90-sata-link-cap.cfg` | `libata.force=1:3.0G` for the HDD port |
+| `/etc/systemd/system/hdd-backup-mirror.{service,timer}` | Nightly 05:15 UTC backup mirror to the HDD (repo `configs/systemd/`) |
+| `~/bin/hdd-backup-mirror.sh` | Mirror script (repo `scripts/hdd-backup-mirror.sh`) |
+| `/home/pronav/server-recovery/maintenance-20261025/` | Archived Docker volumes and pre-change fstab/grub copies from 2026-10-25 |
+| `/home/pronav/server-recovery/retired/20260820T160354Z/` | Checksum-verified n8n/Quip recovery material plus the Domain Hunter pre-removal restore point and pre-retention Phoenix backup; never commit |
 
 ## Adding a New Project
 
@@ -539,8 +650,10 @@ sudo journalctl -u cloudflared --tail 20
 ```
 
 ### Disk space low
+Cold data can be moved to `/mnt/hdd/prsnl/cold-archive/` as a verified `.tar.zst` (see
+`docs/MAINTENANCE-2026-10-25.md` for the tar-compare-then-delete procedure).
 ```bash
-df -h /
+df -h / /mnt/hdd
 sudo docker system prune -a                # Remove unused images
 sudo docker builder prune -f               # Clear build cache
 ```
@@ -555,10 +668,17 @@ ssh pronav@192.168.1.18 "echo '=== UPTIME ===' && uptime && echo '=== MEMORY ===
 | Resource | Total | Used | Available | Notes (as of 2026-06-11) |
 |----------|-------|------|-----------|--------------------------|
 | RAM | 7.7 GB | ~3.7-4.5 GB typical | ~3-4 GB typical | Keep new services lean; embedding is the largest workload (~800MB of its cold pages live in swap by design) |
-| Disk | 218 GB | ~62 GB | ~146 GB | Docker images ~18GB · volumes ~8GB · **build cache regrows ~10-20GB/week** (GH Actions runner + quip rebuilds) — `docker builder prune -f` periodically, or use Quip's `/cleanup` |
+| Disk (SSD `/`) | 218 GB | 115 GB | 97 GB | 55% on 2026-10-25 after image/volume cleanup and moving cold archives + AWS backup to the HDD (was 86%) |
+| Disk (HDD `/mnt/hdd`) | 465 GB | 105 GB | 361 GB | Cold archives, backup mirror, AWS backup, plus 35 GB personal photos |
 | CPU | 2 cores | workload-dependent | Constrained | Celeron is the real bottleneck; avoid piling on crawlers/ML without offloading |
 
 When adding projects, budget ~500MB-2GB RAM per project depending on stack and treat sustained 15-minute load over ~3.0 as a warning. The weekly maintenance script now flags CPU load pressure.
+
+MOC image-size watchlist from 2026-06-29: `moc-embedding:latest` is 5.31GB because `uv sync
+--no-dev` contributes a 5.13GB layer; `moc-worker:latest`/`moc-server` is 3.88GB because the runtime
+copies a 2.87GB root `node_modules` plus 642MB of globally installed Claude/Codex CLIs. Future MOC
+Dockerfile work should split build/runtime stages, prune production deps, and avoid baking model
+caches or unused CLIs into runtime images.
 
 ## Cloudflare Tunnel Routes
 
@@ -570,4 +690,43 @@ Single tunnel (`moc`), config at `/etc/cloudflared/config.yml`:
 | www.prsnl.fyi | localhost:8088 | prsnl-landing |
 | moc.prsnl.fyi | localhost:5173 | moc-web |
 | xd.prsnl.fyi | http_status:404 | parked (dh-web removed) |
-| n8n.prsnl.fyi | localhost:8090 | quip-n8n-gate (Caddy Basic-Auth) → n8n |
+| n8n.prsnl.fyi | http_status:404 | parked after n8n retirement |
+
+## Pending Tasks (as of 2026-10-25)
+
+Single canonical list; other docs link here. Remove items when done.
+
+**Secondary HDD (`/mnt/hdd`)**
+1. **Move the photos off the HDD, then reformat it as ext4.** `/mnt/hdd/Pictures` (~24k photos, 35 GB) may be
+   their *only* copy. Order: copy to the Mac, verify checksums, reformat the whole disk as ext4, migrate
+   `/mnt/hdd/prsnl/`, and update the `/etc/fstab` UUID. Keep the `/mnt/hdd` mountpoint so scripts don't change.
+   Consider an extra copy (e.g. Google Drive) before then.
+2. **Add alerting for the backup mirror.** Hook `hdd-backup-mirror.service` `OnFailure=` to ntfy, and have
+   `weekly-maintenance.sh` flag a stale `/mnt/hdd/prsnl/backup-mirror/LAST_SUCCESS` (older than 2 days).
+   Today a failed run is only visible in the journal and failed-units list.
+3. **Do a restore drill from the HDD mirror.** Restore the latest snapshot from
+   `/mnt/hdd/prsnl/backup-mirror/restic-moc` into a temporary database.
+3a. **Keep the restic key off the SSD.** `~/.restic-moc.key` exists only on the SSD, so if the SSD
+    dies the HDD mirror of restic-moc can't be decrypted. Store a copy in the password manager.
+    Never put it in this repo.
+4. Optional: the `libata.force=1:3.0G` cap (`/etc/default/grub.d/90-sata-link-cap.cfg`) had no
+   measurable effect. Drop it at a convenient reboot, or keep it (it's harmless).
+
+**MOC**
+5. **Recreate the three test DBs the 2026-10-25 reboot destroyed.** These were the proof runs
+   `full456-cb6f-20261021-v2`, `spr01-batch` and `spr01-consent` (ephemeral containers, no mounts).
+   Rebuild them from their own setup steps.
+6. **Before any reboot,** list containers with restart policy `no` or `AutoRemove`; they won't
+   survive it. Give the MOC proof harness persistent volumes or a restart story.
+7. **Decide retention for `~/.local/share/moc-spr-proof`.** It's 39 GiB and was still growing on
+   2026-10-22, making it the largest remaining SSD consumer.
+8. Graph health is still `operationalStatus=critical` (51 exhausted jobs, 462 orphan findings).
+
+**Host / docs**
+9. **Netdata isn't deployed** (no container/image/compose entry), but docs and UFW still list it on 19999.
+   Redeploy it under compose, or remove it from the docs and drop the UFW rule.
+10. **AWS backup tooling.** The `aws-backup-*` units are disabled and its `tools/` scripts point at the
+    old SSD path. Update or delete them if another AWS backup is ever needed. The data lives on
+    `/mnt/hdd/prsnl/aws-account-backups/` and Google Drive.
+11. Long-standing: add a second SSH key (MacBook Air / iPhone). The Mac and the Dell are on different
+    Tailscale networks (LAN SSH works). Ethernet `enp7s0` has no carrier, so the box is WiFi-only.

@@ -11,7 +11,9 @@ A Dell Vostro laptop running Ubuntu Server 24.04 LTS, repurposed as a developmen
 - **CPU:** Intel Celeron 2957U @ 1.4GHz (2 cores, 2 threads) — it's slow, optimize accordingly
 - **RAM:** 8 GB total (7.7 GB usable; check `free -h` before adding heavy services)
 - **Disk:** 240GB Kingston SSD (218GB usable; check `df -h /` before large image pulls)
-- **Docker:** v29.5.2 — ALL apps run as Docker containers, no bare-metal installs
+- **Secondary disk:** 500GB HDD at `/mnt/hdd` (NTFS, 5400 rpm). It's for **cold storage and backup copies only**,
+  never container volumes or databases. Don't touch `/mnt/hdd/Pictures` (personal photos).
+- **Docker:** v29.7.2 — ALL apps run as Docker containers, no bare-metal installs
 
 ## Port Registry — CHECK BEFORE USING ANY PORT
 
@@ -19,26 +21,34 @@ A Dell Vostro laptop running Ubuntu Server 24.04 LTS, repurposed as a developmen
 |------|---------|--------|
 | 22 | SSH | Public |
 | 80, 443 | Cloudflare | Public |
+| 1883 | Ops Deck MQTT | Tailscale only |
 | 3000 | MOC backend | Localhost only |
 | 3001 | Uptime Kuma | Tailscale only |
+| 4111, 4112 | MOC Mastra ops server | Tailscale only |
 | 5001 | Dockge | Tailscale only |
 | 5173 | MOC frontend | Public via Cloudflare Tunnel |
 | 5433 | MOC PostgreSQL | Internal only |
-| 5678 | n8n (workflow automation) | Tailscale + localhost |
+| 5436 | Domain Hunter PostgreSQL | Localhost only |
 | 6006 | Phoenix LLM traces | Tailscale only |
+| 6381 | Domain Hunter Redis | Localhost only |
 | 8004 | MOC embedding | Localhost only |
 | 8006 | MOC graph consolidator | Localhost only |
 | 8007 | Domain Hunter API | Localhost only |
 | 8081 | pgweb | Tailscale only |
-| 8090 | n8n public basic-auth gate | Localhost tunnel origin |
-| 8790 | Quip agents bridge | n8n-net only via UFW |
+| 8787 | prsnl Ops Deck | Tailscale only |
+| 8788 | ntfy | Tailscale only |
+| 8791 | Pranav Desk OS display | Home LAN only |
+| 8792 | Pranav Desk OS admin | Tailscale only |
 | 9443 | Portainer | Tailscale only |
 | 9999 | Dozzle | Tailscale only |
 | 19999 | Netdata | Tailscale only |
 
-**Available ranges:** 3100-3199, 4000-4999, 5174-5435, 5437-5499, 6000-6379, 6382-7999, 8012-8999
+**Available ranges:** 3100-3199, 4000-4999, 5174-5435, 5437-5499, 6000-6379,
+6382-7879, 7882-7999, 8013-8786, 8789-8790, 8793-8999. Recheck `CLAUDE.md` and live listeners before use.
 
-For n8n-specific runtime, security, Quip/WhatsApp, and ntfy decisions, read `docs/N8N-ARCHITECTURE.md` before changing `~/docker/n8n/`.
+n8n and Quip were retired on 2026-08-20. Domain Hunter is active; all 11 containers, its nightly
+database backup, and its dedicated GitHub Actions runner were restored and reverified that day.
+Read `CLAUDE.md` before changing any of those ports or services.
 
 ## How to Access
 
@@ -136,7 +146,7 @@ Do NOT remove or modify these containers. They are infrastructure.
 ### Performance
 - **CPU is weak** (1.4GHz Celeron). Avoid CPU-heavy operations. Use `--cpus` limits in Docker if needed, and treat sustained 15-minute load above ~3.0 as a capacity warning.
 - **RAM is limited** (8GB shared across everything). Keep containers lean. Use Alpine-based images where possible. Monitor with `free -h`.
-- **Disk is 240GB total.** Don't pull massive Docker images unnecessarily. Clean up with `docker system prune` periodically.
+- **SSD is 240GB total.** Don't pull massive Docker images unnecessarily. Archive cold data to `/mnt/hdd/prsnl/cold-archive/` rather than deleting it. Clean up with `docker system prune` periodically.
 
 ### Reliability
 - This is a home server, NOT a datacenter. Power cuts and WiFi drops can happen.
@@ -171,6 +181,7 @@ Do NOT remove or modify these containers. They are infrastructure.
 | `/etc/docker/daemon.json` | Docker daemon config |
 | `/etc/fail2ban/jail.local` | Fail2ban config |
 | `/etc/sysctl.d/99-server.conf` | Kernel tuning |
+| `/mnt/hdd/prsnl/` | HDD: `backup-mirror/`, `cold-archive/`, `aws-account-backups/` (see CLAUDE.md) |
 
 ## Health Check
 

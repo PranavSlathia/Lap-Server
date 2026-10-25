@@ -1,0 +1,12 @@
+[Unit]
+Description=Mirror Dell backups to the secondary HDD (/mnt/hdd)
+RequiresMountsFor=/mnt/hdd
+After=moc-backup.service dh-pg-backup.service deskos-backup.service
+
+[Service]
+Type=oneshot
+User=pronav
+Group=pronav
+Nice=10
+IOSchedulingClass=idle
+ExecStart=/home/pronav/bin/hdd-backup-mirror.sh
